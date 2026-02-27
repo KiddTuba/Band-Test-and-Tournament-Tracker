@@ -24,15 +24,41 @@
 
       body { background:#f8fafc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 
-      /* --- Bracket Container & Layout --- */
-      .bracket-wrapper {
-          position: relative;
-          padding: 20px 10px;
+      /* --- Fullscreen Mode --- */
+      .fullscreen-overlay {
+          position: fixed !important;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100vw;
+          height: 100vh;
+          z-index: 99999;
+          background-color: #f8fafc;
+          overflow-y: auto;
+          margin: 0 !important;
+          padding: 0;
+          border-radius: 0 !important;
           display: flex;
           flex-direction: column;
+      }
+
+      /* --- Bracket Container & Layout --- */
+      .bracket-scroll-container {
+          width: 100%;
+          overflow-x: auto;
+          text-align: center;
+          background-color: #f4f7f6;
+          flex-grow: 1; /* Helps fill space in fullscreen */
+      }
+
+      .bracket-wrapper {
+          position: relative;
+          padding: 40px 60px; /* Generous padding prevents edge clipping */
+          display: inline-flex;
+          flex-direction: column;
           align-items: center;
-          width: max-content;
-          margin: 0 auto;
+          text-align: left; /* Reset text align for internal elements */
       }
 
       .bracket-headers {
@@ -938,16 +964,16 @@
           }
 
           return (
-              <div className="bracket-wrapper w-full overflow-x-auto bg-[#f4f7f6] pt-10 pb-20 border rounded-xl">
+              <div className="bracket-wrapper">
                   {/* Headers */}
-                  <div className="bracket-headers min-w-max">
+                  <div className="bracket-headers">
                       {leftCols.map((c, i) => <div key={`lh-${i}`} className="h-col">{c.label}</div>)}
                       <div className="h-col center">Championship</div>
                       {rightCols.map((c, i) => <div key={`rh-${i}`} className="h-col">{c.label}</div>)}
                   </div>
 
                   {/* Body */}
-                  <div className="bracket-body min-w-max relative mt-6">
+                  <div className="bracket-body relative mt-6">
                       <div className="region-watermark wm-nocap">No Cap</div>
                       <div className="region-watermark wm-aura">Aura</div>
                       <div className="region-watermark wm-vibe">Vibe Check</div>
@@ -1124,6 +1150,9 @@
         const [size, setSize] = useState(64);
         const [date, setDate] = useState(todayISO());
         const [name, setName] = useState("Band Madness");
+        
+        // Fullscreen tracking state
+        const [fullscreenTournamentId, setFullscreenTournamentId] = useState(null);
         
         const audioRef = useRef({});
 
@@ -1330,33 +1359,56 @@
               </p>
             </Card>
 
-            {state.tournaments.map((t) => (
-              <div key={t.id} className="relative mt-8">
-                {/* Visual Header suitable for print */}
-                <div className="w-full bg-gradient-to-br from-[#002147] to-[#001530] text-white p-4 flex items-center justify-center gap-4 rounded-t-2xl border-b-4 border-blue-400">
-                    <LogoSVG />
-                    <div className="text-center">
-                        <h1 className="text-3xl italic font-black uppercase tracking-wider text-shadow-md">{t.name}</h1>
-                        <p className="text-blue-300 font-bold tracking-wide uppercase">{t.instrument === "All" ? "Whippet Barking Battalion" : `${t.instrument} Battalion`}</p>
-                    </div>
-                </div>
+            {state.tournaments.map((t) => {
+              const isFullscreen = fullscreenTournamentId === t.id;
 
-                <div className="bg-white p-4 border-x flex flex-wrap gap-2 items-center justify-between no-print">
-                   <div className="text-sm font-semibold">
-                       {t.date} • {t.size}-Seed Bracket
-                   </div>
-                   <div>
-                       <Button onClick={() => window.print()} className="font-bold border-blue-600 text-blue-700 bg-blue-50">🖨️ Print Full Bracket</Button>
-                   </div>
-                </div>
+              return (
+                <div key={t.id} className={isFullscreen ? "fullscreen-overlay" : "relative mt-8 bg-white border shadow-sm rounded-2xl overflow-hidden"}>
+                  {/* Visual Header suitable for print */}
+                  <div className="w-full bg-gradient-to-br from-[#002147] to-[#001530] text-white p-4 flex items-center justify-center gap-4 border-b-4 border-blue-400">
+                      <LogoSVG />
+                      <div className="text-center">
+                          <h1 className="text-3xl italic font-black uppercase tracking-wider text-shadow-md">{t.name}</h1>
+                          <p className="text-blue-300 font-bold tracking-wide uppercase">{t.instrument === "All" ? "Whippet Barking Battalion" : `${t.instrument} Battalion`}</p>
+                      </div>
+                  </div>
 
-                <BracketView
-                  tournament={t}
-                  students={state.students}
-                  onSetWinner={(matchId, winnerId) => setWinner(t.id, matchId, winnerId)}
-                />
-              </div>
-            ))}
+                  <div className="bg-white p-4 border-b flex flex-wrap gap-2 items-center justify-between no-print">
+                     <div className="text-sm font-semibold">
+                         {t.date} • {t.size}-Seed Bracket
+                     </div>
+                     <div className="flex gap-2">
+                         <Button 
+                             onClick={() => setFullscreenTournamentId(isFullscreen ? null : t.id)} 
+                             className="font-bold border-purple-600 text-purple-700 bg-purple-50"
+                         >
+                             {isFullscreen ? "↙️ Exit Full Screen" : "📺 Full Screen"}
+                         </Button>
+                         <Button onClick={() => window.print()} className="font-bold border-blue-600 text-blue-700 bg-blue-50">🖨️ Print Full Bracket</Button>
+                     </div>
+                  </div>
+
+                  {/* Bracket View inside a Scrolling Container */}
+                  <div className="bracket-scroll-container">
+                      <BracketView
+                        tournament={t}
+                        students={state.students}
+                        onSetWinner={(matchId, winnerId) => setWinner(t.id, matchId, winnerId)}
+                      />
+                  </div>
+
+                  {/* Built-in Soundboard */}
+                  <div className="flex flex-wrap justify-center items-center gap-3 p-4 bg-gray-50 border-t border-gray-200 no-print">
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mr-2">Soundboard</span>
+                      <Button onClick={() => playSound("tournamentStart")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 SportsCenter Start</Button>
+                      <Button onClick={() => playSound("betweenRoundsA")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 NBA on ESPN</Button>
+                      <Button onClick={() => playSound("betweenRoundsB")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 ESPN Theme</Button>
+                      <Button onClick={() => playSound("deepRun")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 Deep Run</Button>
+                      <Button onClick={() => playSound("victory")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 Victory Chime</Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
       }
