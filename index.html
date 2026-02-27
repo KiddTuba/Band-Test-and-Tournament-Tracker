@@ -473,8 +473,6 @@
                             const localTime = prev._lastModified || 0;
                             const cloudTime = cloudData._lastModified || 0;
                             
-                            // If cloud data is newer than our local data, or if local data is untouched default,
-                            // adopt the cloud data! This ensures public viewers always see the latest.
                             if (cloudTime > localTime || !prev.students.length) {
                                 return hydrateState(cloudData);
                             }
@@ -956,13 +954,184 @@
         );
       }
 
-      // ------------------------------------ Chairs Manager ------------------------------------
+      // ------------------------------------ Chairs Manager (Admin) ------------------------------------
       function ChairsManager({ state, setState }) {
+        const [selectedTestId, setSelectedTestId] = useState("");
+        const [selectedTourneyId, setSelectedTourneyId] = useState("");
+
+        const tests = (state.chairTests || []).filter(t => !t.isArchived);
+        const tourneys = (state.tournaments || []).filter(t => !t.isArchived && t.testId === selectedTestId);
+
+        useEffect(() => {
+            if (!selectedTestId && tests.length > 0) setSelectedTestId(tests[0].id);
+        }, [tests]);
+
+        function handleGenerate() {
+            if (!selectedTestId) {
+                alert("Please select a Base Chair Test first.");
+                return;
+            }
+            
+            const test = state.chairTests.find(t => t.id === selectedTestId);
+            const tourney = state.tournaments.find(t => t.id === selectedTourneyId);
+            
+            const newOrders = {};
+            INSTRUMENTS.forEach(inst => {
+                const instStudents = state.students.filter(s => s.instrument === inst);
+                let rankedIds = [];
+                
+                if (!tourney) {
+                    // Score only
+                    rankedIds = instStudents
+                        .map(s => ({ id: s.id, score: Number(test?.scores?.[s.id] || 0) }))
+                        .sort((a,b) => b.score - a.score)
+                        .map(x => x.id);
+                } else {
+                    // Tournament Reach + Random Tiebreaker + Score for non-participants
+                    const roundReached = {};
+                    tourney.bracket.rounds.forEach((round, rIdx) => {
+                        round.matches.forEach(m => {
+                            if (m.p1Id) roundReached[m.p1Id] = rIdx;
+                            if (m.p2Id) roundReached[m.p2Id] = rIdx;
+                            if (m.winnerId) roundReached[m.winnerId] = rIdx + 1; 
+                        });
+                    });
+                    
+                    const tourneyPlayers = instStudents.filter(s => roundReached[s.id] !== undefined);
+                    const nonTourney = instStudents.filter(s => roundReached[s.id] === undefined);
+                    
+                    // Sort tournament players
+                    tourneyPlayers.sort((a,b) => {
+                        if (roundReached[b.id] !== roundReached[a.id]) {
+                            return roundReached[b.id] - roundReached[a.id];
+                        }
+                        // Luck of the draw for ties!
+                        return Math.random() - 0.5;
+                    });
+                    
+                    // Sort non-tournament players by score
+                    nonTourney.sort((a,b) => Number(test?.scores?.[b.id] || 0) - Number(test?.scores?.[a.id] || 0));
+                    
+                    rankedIds = [...tourneyPlayers.map(s=>s.id), ...nonTourney.map(s=>s.id)];
+                }
+                newOrders[inst] = rankedIds;
+            });
+            
+            setState(prev => ({ ...prev, chairOrders: newOrders }));
+        }
+
+        function moveChair(inst, index, direction) {
+            setState(prev => {
+                const arr = [...(prev.chairOrders[inst] || [])];
+                if (direction === 'up' && index > 0) {
+                    [arr[index-1], arr[index]] = [arr[index], arr[index-1]];
+                } else if (direction === 'down' && index < arr.length - 1) {
+                    [arr[index+1], arr[index]] = [arr[index], arr[index+1]];
+                }
+                return { ...prev, chairOrders: { ...prev.chairOrders, [inst]: arr } };
+            });
+        }
+
         return (
-           <Card title="Chairs Module">
-              <div className="text-gray-600 text-sm">Automated seating handled via Tournaments and Chair tests. (Visualized here in future updates)</div>
-           </Card>
+           <div className="space-y-6">
+               <Card title="Auto-Generate Chair Order">
+                   <div className="flex flex-col md:flex-row gap-4 items-end">
+                       <div className="w-full">
+                           <label className="block text-sm font-bold text-[#002147] mb-1">Base Chair Test</label>
+                           <Select value={selectedTestId} onChange={(e) => { setSelectedTestId(e.target.value); setSelectedTourneyId(""); }}>
+                               <option value="">-- Select Test --</option>
+                               {tests.map(t => <option key={t.id} value={t.id}>{t.name} ({t.date})</option>)}
+                           </Select>
+                       </div>
+                       <div className="w-full">
+                           <label className="block text-sm font-bold text-[#002147] mb-1">Associated Tournament (Optional)</label>
+                           <Select value={selectedTourneyId} onChange={(e) => setSelectedTourneyId(e.target.value)}>
+                               <option value="">-- No Tournament (Score Only) --</option>
+                               {tourneys.map(t => <option key={t.id} value={t.id}>{t.name} ({t.date})</option>)}
+                           </Select>
+                       </div>
+                       <Button onClick={handleGenerate} className="bg-[#002147] text-white font-bold whitespace-nowrap px-6">⚡ Auto-Generate</Button>
+                   </div>
+                   <p className="text-xs text-gray-500 mt-3">
+                       <strong>Logic:</strong> Tournament participants rank highest (based on furthest round reached). Ties (knocked out in the same round) are decided by a random draw. Non-participants are placed underneath, ordered by their Base Chair Test score.
+                   </p>
+               </Card>
+
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+                    {INSTRUMENTS.map(inst => {
+                        const order = state.chairOrders[inst] || [];
+                        return (
+                            <div key={inst} className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-t-[#7BAFD4]">
+                                <h3 className="font-black text-[#002147] text-xl mb-3 border-b pb-2 uppercase tracking-wide">{inst}</h3>
+                                {order.length === 0 ? <p className="text-gray-400 italic text-sm">No chairs set.</p> : (
+                                    <div className="flex flex-col gap-2">
+                                        {order.map((id, idx) => {
+                                            const s = state.students.find(x => x.id === id);
+                                            if (!s) return null;
+                                            return (
+                                                <div key={id} className="flex justify-between items-center bg-gray-50 p-2 rounded border hover:bg-gray-100 transition">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-black text-gray-400 w-8 text-right text-lg">#{idx+1}</span>
+                                                        <span className="font-bold text-[#002147]">{s.name}</span>
+                                                    </div>
+                                                    <div className="flex gap-1 no-print">
+                                                        <Button onClick={() => moveChair(inst, idx, 'up')} disabled={idx === 0} className="px-2 py-1 text-xs bg-white text-gray-600">▲</Button>
+                                                        <Button onClick={() => moveChair(inst, idx, 'down')} disabled={idx === order.length - 1} className="px-2 py-1 text-xs bg-white text-gray-600">▼</Button>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+           </div>
         );
+      }
+
+      // ------------------------------------ Public Chairs View ------------------------------------
+      function PublicChairs({ state }) {
+          return (
+              <div className="space-y-6">
+                  <div className="w-full bg-gradient-to-r from-[#002147] to-[#001530] text-white p-6 rounded-2xl shadow-lg border-b-4 border-[#7BAFD4] flex flex-col items-center justify-center text-center">
+                      <h1 className="text-4xl italic font-black uppercase tracking-wider text-shadow-md mb-2">Official Chair Order</h1>
+                      <p className="text-blue-300 font-bold tracking-wide uppercase text-sm">Whippet Barking Battalion Rankings</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {INSTRUMENTS.map(inst => {
+                        const order = state.chairOrders[inst] || [];
+                        if (order.length === 0) return null;
+                        
+                        return (
+                            <div key={inst} className="bg-white rounded-xl shadow-md border-2 border-[#002147] overflow-hidden">
+                                <div className="bg-[#002147] text-white p-3 text-center">
+                                    <h3 className="text-xl font-black uppercase tracking-widest">{inst}</h3>
+                                </div>
+                                <div className="p-0">
+                                    {order.map((id, idx) => {
+                                        const s = state.students.find(x => x.id === id);
+                                        if (!s) return null;
+                                        return (
+                                            <div key={id} className={`flex items-center px-4 py-3 border-b last:border-b-0 ${idx === 0 ? 'bg-[#FFFDF0] font-black' : 'bg-white font-bold text-gray-700'}`}>
+                                                <div className={`w-10 text-right mr-4 ${idx===0 ? 'text-yellow-600 text-xl' : 'text-gray-400'}`}>
+                                                    #{idx+1}
+                                                </div>
+                                                <div className="text-lg uppercase tracking-wide">
+                                                    {s.name}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )
+                    })}
+                  </div>
+              </div>
+          )
       }
 
       // ------------------------------------ Archives ------------------------------------
@@ -1043,7 +1212,7 @@
                   }
                   champs[cName].wins += 1;
                   champs[cName].defenses += 1;
-                  champs[cName].titles.push(`${t.name} (${t.date})`);
+                  champs[cName].titles.push({ tournamentName: t.name, date: t.date });
                   
                   // Find the absolute latest active champion
                   if (!t.isArchived && t.date >= latestDate) {
@@ -1090,17 +1259,21 @@
                                           <span>Championships: <span className="text-[#002147] text-lg">{c.wins}</span></span>
                                           <span>Defenses: <span className="text-[#002147] text-lg">{Math.max(0, c.defenses)}</span></span>
                                       </div>
-                                      <div className="text-xs text-gray-500 uppercase font-bold mb-1">Titles Held:</div>
-                                      <ul className="text-sm list-disc pl-4 text-[#002147] font-medium mb-4">
-                                          {c.titles.map((title, idx) => (
-                                              <li key={idx}>{title}</li>
+                                      <div className="text-xs text-gray-500 uppercase font-bold mb-2">Titles Held:</div>
+                                      <ul className="text-sm flex flex-col gap-2">
+                                          {c.titles.map((tInfo, idx) => (
+                                              <li key={idx} className="flex justify-between items-center bg-gray-50 border p-2 rounded text-[#002147] font-bold">
+                                                  <span>{tInfo.tournamentName} <span className="text-gray-500 font-normal text-xs ml-1">({tInfo.date})</span></span>
+                                                  <button 
+                                                      onClick={() => onPrintCert({ champName: c.name, date: tInfo.date, tournamentName: tInfo.tournamentName })} 
+                                                      className="text-lg hover:scale-110 active:scale-95 transition-transform no-print"
+                                                      title="Print Certificate for this specific win"
+                                                  >
+                                                      🖨️
+                                                  </button>
+                                              </li>
                                           ))}
                                       </ul>
-                                  </div>
-                                  <div className="p-3 bg-gray-50 border-t flex justify-center no-print mt-auto">
-                                      <Button onClick={() => onPrintCert(c.name)} className="w-full bg-yellow-50 text-yellow-800 border-yellow-300 font-bold hover:bg-yellow-100">
-                                          🖨️ Print Certificate
-                                      </Button>
                                   </div>
                               </div>
                           ))}
@@ -1111,20 +1284,17 @@
       }
 
       // ------------------------------------ Certificate View ------------------------------------
-      function CertificateView({ champName, onCancel }) {
-          useEffect(() => {
-              // Optionally trigger print automatically after a tiny delay for rendering
-              // setTimeout(() => window.print(), 500);
-          }, []);
-
+      function CertificateView({ data, onCancel }) {
+          // data = { champName, date, tournamentName }
+          
           return (
               <div className="fixed inset-0 z-[100000] bg-gray-200 overflow-y-auto print-cert-only flex justify-center p-8 no-print-bg">
                   <div className="relative w-[11in] h-[8.5in] bg-white shadow-2xl flex flex-col items-center justify-center p-16 text-center border-[20px] border-double border-[#002147] mx-auto print:shadow-none print:w-full print:h-full print:border-[16px] print:m-0 print:p-12">
                       
                       {/* Controls (Hidden when actually printing) */}
                       <div className="absolute top-6 right-6 no-print flex gap-2">
-                          <Button onClick={onCancel} className="bg-gray-200 text-gray-800 font-bold">⬅ Back to Hall</Button>
-                          <Button onClick={() => window.print()} className="bg-blue-600 text-white font-bold shadow-lg">🖨️ Print Now</Button>
+                          <Button onClick={onCancel} className="bg-gray-200 text-gray-800 font-bold border-gray-400">⬅ Back to Hall</Button>
+                          <Button onClick={() => window.print()} className="bg-blue-600 text-white font-bold border-blue-700 shadow-lg">🖨️ Print Now</Button>
                       </div>
 
                       <LogoSVG className="h-28 w-28 mb-6" />
@@ -1135,11 +1305,11 @@
                       <p className="text-2xl mb-4 italic text-gray-800">This certifies that</p>
                       
                       <div className="text-7xl font-black text-yellow-600 border-b-4 border-yellow-600 pb-2 mb-10 px-16 inline-block">
-                          {champName}
+                          {data.champName}
                       </div>
                       
                       <p className="text-xl max-w-3xl mb-16 text-gray-700 leading-relaxed">
-                          Has demonstrated unparalleled musical mastery, exceptional skill, and fierce competitive spirit to triumph over all challengers and claim the ultimate title of <strong>Champion</strong>.
+                          Has demonstrated unparalleled musical mastery, exceptional skill, and fierce competitive spirit to triumph over all challengers and claim the ultimate title of <strong>Champion</strong> in the <strong>{data.tournamentName}</strong>.
                       </p>
                       
                       <div className="flex justify-between w-full max-w-4xl px-12 mt-auto">
@@ -1148,7 +1318,7 @@
                               <span className="text-xl font-bold uppercase text-gray-800 tracking-wider">Director's Signature</span>
                           </div>
                           <div className="flex flex-col items-center">
-                              <div className="text-2xl font-bold border-b-2 border-black mb-2 px-12 py-1">{new Date().toLocaleDateString()}</div>
+                              <div className="text-2xl font-bold border-b-2 border-black mb-2 px-12 py-1">{data.date}</div>
                               <span className="text-xl font-bold uppercase text-gray-800 tracking-wider">Date Awarded</span>
                           </div>
                       </div>
@@ -1856,12 +2026,12 @@
         const [printCertFor, setPrintCertFor] = useState(null);
 
         useEffect(() => {
-            if (isAdmin && (tab === "Live Brackets" || tab === "Hall of Champions")) setTab("Tournaments");
-            if (!isAdmin && tab !== "Live Brackets" && tab !== "Hall of Champions") setTab("Live Brackets");
+            if (isAdmin && (tab === "Live Brackets" || tab === "Hall of Champions" || tab === "Public Chairs")) setTab("Tournaments");
+            if (!isAdmin && !["Live Brackets", "Hall of Champions", "Public Chairs"].includes(tab)) setTab("Live Brackets");
         }, [isAdmin]);
 
         const adminTabs = ["Students", "Daily Grades", "Chair Tests", "Chairs", "Tournaments", "Archives", "Section Points", "Backup"];
-        const publicTabs = ["Live Brackets", "Hall of Champions"];
+        const publicTabs = ["Live Brackets", "Public Chairs", "Hall of Champions"];
         const tabs = isAdmin ? adminTabs : publicTabs;
 
         function toggleAdmin() {
@@ -1879,7 +2049,7 @@
 
         // If rendering certificate, hijack entire view
         if (printCertFor) {
-            return <CertificateView champName={printCertFor} onCancel={() => setPrintCertFor(null)} />;
+            return <CertificateView data={printCertFor} onCancel={() => setPrintCertFor(null)} />;
         }
 
         return (
@@ -1918,6 +2088,7 @@
               
               {/* Shared/Public Views */}
               {(tab === "Tournaments" || tab === "Live Brackets") && <Tournaments state={state} setState={setState} isAdmin={isAdmin} />}
+              {tab === "Public Chairs" && <PublicChairs state={state} />}
               {tab === "Hall of Champions" && <HallOfChampions state={state} onPrintCert={setPrintCertFor} />}
 
             </div>
