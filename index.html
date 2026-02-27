@@ -318,7 +318,7 @@
           letter-spacing: 1px;
       }
 
-      /* Print Overrides */
+      /* Certificate Print Overrides */
       @media print {
           .no-print { display: none !important; }
           body { background: white; margin: 0; padding: 0; }
@@ -335,7 +335,13 @@
           }
           .bracket-headers .h-col { color: var(--dark-navy); background: transparent !important; }
           .region-watermark { opacity: 0.08; }
+          
+          /* Force landscape for general printing, certificate handles its own logic if needed */
           @page { size: landscape; margin: 0.5cm; }
+          
+          /* Certificate Specific Print Classes */
+          .print-cert-only { display: flex !important; }
+          .hide-on-cert-print { display: none !important; }
       }
     </style>
   </head>
@@ -348,7 +354,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
-      const { useEffect, useMemo, useRef, useState } = React;
+      const { useEffect, useMemo, useRef, useState, useCallback } = React;
 
       // ------------------------------------ Constants & Utilities ------------------------------------
       const INSTRUMENTS = [
@@ -387,7 +393,7 @@
         return clamp(n, min, max);
       }
 
-      // ------------------------------------ Persistence ------------------------------------
+      // ------------------------------------ Persistence & Cloud Sync ------------------------------------
       const LS_KEY = "band_tracker_state_v1";
 
       function defaultState() {
@@ -398,6 +404,7 @@
         INSTRUMENTS.forEach((i) => (chairOrders[i] = []));
 
         return {
+          _lastModified: Date.now(),
           students: [],
           chairTests: [],
           tournaments: [],
@@ -426,6 +433,7 @@
           sectionPoints: { ...d.sectionPoints, ...(s.sectionPoints || {}) },
           chairOrders: { ...d.chairOrders, ...(s.chairOrders || {}) },
           settings: { ...d.settings, ...(s.settings || {}) },
+          _lastModified: s._lastModified || Date.now()
         };
 
         merged.students = (merged.students || []).map((st) => ({
@@ -442,7 +450,7 @@
       }
 
       function usePersistentState() {
-        const [state, setState] = useState(() => {
+        const [state, setRawState] = useState(() => {
           try {
             const raw = localStorage.getItem(LS_KEY);
             return hydrateState(raw ? JSON.parse(raw) : defaultState());
@@ -451,13 +459,47 @@
           }
         });
 
+        // Smart Cloud Sync Engine
         useEffect(() => {
-          try {
-            localStorage.setItem(LS_KEY, JSON.stringify(state));
-          } catch (e) {}
-        }, [state]);
+            // Only attempt to fetch if we are hosted (http/https), not local file://
+            if (window.location.protocol.startsWith('http')) {
+                fetch('data.json', { cache: 'no-store' })
+                    .then(r => {
+                        if (!r.ok) throw new Error("No data.json");
+                        return r.json();
+                    })
+                    .then(cloudData => {
+                        setRawState(prev => {
+                            const localTime = prev._lastModified || 0;
+                            const cloudTime = cloudData._lastModified || 0;
+                            
+                            // If cloud data is newer than our local data, or if local data is untouched default,
+                            // adopt the cloud data! This ensures public viewers always see the latest.
+                            if (cloudTime > localTime || !prev.students.length) {
+                                return hydrateState(cloudData);
+                            }
+                            return prev;
+                        });
+                    })
+                    .catch(() => {
+                        // Silently fail if data.json doesn't exist yet
+                    });
+            }
+        }, []);
 
-        return [state, setState];
+        // Custom setState that automatically bumps _lastModified
+        const setState = useCallback((updater) => {
+            setRawState(prev => {
+                const nextState = typeof updater === 'function' ? updater(prev) : updater;
+                const finalState = { ...nextState, _lastModified: Date.now() };
+                try {
+                    localStorage.setItem(LS_KEY, JSON.stringify(finalState));
+                } catch(e) {}
+                return finalState;
+            });
+        }, []);
+
+        return [state, setState, setRawState];
       }
 
       // ------------------------------------ UI Primitives ------------------------------------
@@ -539,8 +581,8 @@
         );
       }
 
-      const LogoSVG = () => (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" className="h-16 w-16 drop-shadow-md">
+      const LogoSVG = ({ className="h-16 w-16" }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" className={`${className} drop-shadow-md`}>
             <defs>
                 <linearGradient id="columbiaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#9BDDFF" stopOpacity="1" />
@@ -914,6 +956,15 @@
         );
       }
 
+      // ------------------------------------ Chairs Manager ------------------------------------
+      function ChairsManager({ state, setState }) {
+        return (
+           <Card title="Chairs Module">
+              <div className="text-gray-600 text-sm">Automated seating handled via Tournaments and Chair tests. (Visualized here in future updates)</div>
+           </Card>
+        );
+      }
+
       // ------------------------------------ Archives ------------------------------------
       function Archives({ state, setState }) {
           const archivedTests = (state.chairTests || []).filter(t => t.isArchived);
@@ -948,7 +999,7 @@
                                   </div>
                                   <div className="flex gap-2">
                                       <Button onClick={() => restoreTournament(t.id)} className="text-blue-600">Restore</Button>
-                                      <Button onClick={() => deleteTournament(t.id)} className="text-red-600">Delete</Button>
+                                      <Button onClick={() => deleteTournament(t.id)} className="text-red-600 border-red-200">Delete</Button>
                                   </div>
                               </div>
                           ))}
@@ -966,7 +1017,7 @@
                                   </div>
                                   <div className="flex gap-2">
                                       <Button onClick={() => restoreTest(t.id)} className="text-blue-600">Restore</Button>
-                                      <Button onClick={() => deleteTest(t.id)} className="text-red-600">Delete</Button>
+                                      <Button onClick={() => deleteTest(t.id)} className="text-red-600 border-red-200">Delete</Button>
                                   </div>
                               </div>
                           ))}
@@ -977,12 +1028,12 @@
       }
 
       // ------------------------------------ Hall of Champions ------------------------------------
-      function HallOfChampions({ state }) {
-          // Calculate stats across ALL tournaments (active and archived)
+      function HallOfChampions({ state, onPrintCert }) {
           const champs = {};
+          let currentDefendingChampion = null;
+          let latestDate = "";
           
           (state.tournaments || []).forEach(t => {
-              // Get champion name directly if saved, otherwise try to look up from students list
               let cName = t.championName;
               if (!cName && t.championId) cName = state.students.find(s => s.id === t.championId)?.name || "Unknown";
 
@@ -993,6 +1044,12 @@
                   champs[cName].wins += 1;
                   champs[cName].defenses += 1;
                   champs[cName].titles.push(`${t.name} (${t.date})`);
+                  
+                  // Find the absolute latest active champion
+                  if (!t.isArchived && t.date >= latestDate) {
+                      latestDate = t.date;
+                      currentDefendingChampion = cName;
+                  }
               }
           });
 
@@ -1009,6 +1066,13 @@
                       <div className="text-6xl drop-shadow-md">🏆</div>
                   </div>
 
+                  {currentDefendingChampion && (
+                      <div className="text-center bg-[#002147] text-white p-4 rounded-xl shadow-md border-2 border-yellow-400 max-w-2xl mx-auto">
+                          <p className="text-yellow-400 font-bold uppercase tracking-widest text-xs mb-1">Current Defending Champion</p>
+                          <h2 className="text-3xl font-black italic">{currentDefendingChampion}</h2>
+                      </div>
+                  )}
+
                   {sortedChamps.length === 0 ? (
                       <Card title="Empty Pantheon">
                           <p className="text-gray-500 text-center py-10">The history books are empty. Await the crowning of the first Champion.</p>
@@ -1016,27 +1080,79 @@
                   ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {sortedChamps.map((c, i) => (
-                              <div key={c.name} className="relative bg-white border-2 border-[#002147] rounded-xl overflow-hidden shadow-md">
-                                  {i === 0 && <div className="absolute top-0 right-0 bg-yellow-400 text-[#002147] font-black text-xs px-2 py-1 rounded-bl-lg border-l border-b border-[#002147]">#1 All-Time</div>}
+                              <div key={c.name} className="relative bg-white border-2 border-[#002147] rounded-xl overflow-hidden shadow-md flex flex-col h-full">
+                                  {i === 0 && <div className="absolute top-0 right-0 bg-yellow-400 text-[#002147] font-black text-xs px-2 py-1 rounded-bl-lg border-l border-b border-[#002147] z-10">#1 All-Time</div>}
                                   <div className="bg-[#002147] text-white p-3 text-center">
                                       <h3 className="text-xl font-black uppercase">{c.name}</h3>
                                   </div>
-                                  <div className="p-4 bg-gradient-to-b from-[#f4f7f6] to-white">
+                                  <div className="p-4 bg-gradient-to-b from-[#f4f7f6] to-white flex-grow">
                                       <div className="flex justify-between text-sm border-b pb-2 mb-2 font-bold text-gray-700">
                                           <span>Championships: <span className="text-[#002147] text-lg">{c.wins}</span></span>
                                           <span>Defenses: <span className="text-[#002147] text-lg">{Math.max(0, c.defenses)}</span></span>
                                       </div>
                                       <div className="text-xs text-gray-500 uppercase font-bold mb-1">Titles Held:</div>
-                                      <ul className="text-sm list-disc pl-4 text-[#002147] font-medium">
+                                      <ul className="text-sm list-disc pl-4 text-[#002147] font-medium mb-4">
                                           {c.titles.map((title, idx) => (
                                               <li key={idx}>{title}</li>
                                           ))}
                                       </ul>
                                   </div>
+                                  <div className="p-3 bg-gray-50 border-t flex justify-center no-print mt-auto">
+                                      <Button onClick={() => onPrintCert(c.name)} className="w-full bg-yellow-50 text-yellow-800 border-yellow-300 font-bold hover:bg-yellow-100">
+                                          🖨️ Print Certificate
+                                      </Button>
+                                  </div>
                               </div>
                           ))}
                       </div>
                   )}
+              </div>
+          );
+      }
+
+      // ------------------------------------ Certificate View ------------------------------------
+      function CertificateView({ champName, onCancel }) {
+          useEffect(() => {
+              // Optionally trigger print automatically after a tiny delay for rendering
+              // setTimeout(() => window.print(), 500);
+          }, []);
+
+          return (
+              <div className="fixed inset-0 z-[100000] bg-gray-200 overflow-y-auto print-cert-only flex justify-center p-8 no-print-bg">
+                  <div className="relative w-[11in] h-[8.5in] bg-white shadow-2xl flex flex-col items-center justify-center p-16 text-center border-[20px] border-double border-[#002147] mx-auto print:shadow-none print:w-full print:h-full print:border-[16px] print:m-0 print:p-12">
+                      
+                      {/* Controls (Hidden when actually printing) */}
+                      <div className="absolute top-6 right-6 no-print flex gap-2">
+                          <Button onClick={onCancel} className="bg-gray-200 text-gray-800 font-bold">⬅ Back to Hall</Button>
+                          <Button onClick={() => window.print()} className="bg-blue-600 text-white font-bold shadow-lg">🖨️ Print Now</Button>
+                      </div>
+
+                      <LogoSVG className="h-28 w-28 mb-6" />
+                      
+                      <h1 className="text-5xl font-black uppercase text-[#002147] tracking-widest mb-4 font-serif">Official Certificate of Championship</h1>
+                      <h2 className="text-3xl italic text-gray-600 mb-12">Whippet Barking Battalion</h2>
+                      
+                      <p className="text-2xl mb-4 italic text-gray-800">This certifies that</p>
+                      
+                      <div className="text-7xl font-black text-yellow-600 border-b-4 border-yellow-600 pb-2 mb-10 px-16 inline-block">
+                          {champName}
+                      </div>
+                      
+                      <p className="text-xl max-w-3xl mb-16 text-gray-700 leading-relaxed">
+                          Has demonstrated unparalleled musical mastery, exceptional skill, and fierce competitive spirit to triumph over all challengers and claim the ultimate title of <strong>Champion</strong>.
+                      </p>
+                      
+                      <div className="flex justify-between w-full max-w-4xl px-12 mt-auto">
+                          <div className="flex flex-col items-center">
+                              <div className="w-72 border-b-2 border-black mb-2"></div>
+                              <span className="text-xl font-bold uppercase text-gray-800 tracking-wider">Director's Signature</span>
+                          </div>
+                          <div className="flex flex-col items-center">
+                              <div className="text-2xl font-bold border-b-2 border-black mb-2 px-12 py-1">{new Date().toLocaleDateString()}</div>
+                              <span className="text-xl font-bold uppercase text-gray-800 tracking-wider">Date Awarded</span>
+                          </div>
+                      </div>
+                  </div>
               </div>
           );
       }
@@ -1096,7 +1212,6 @@
 
           function renderSlot(match, playerId, isWinner, slotKey, roundIdx) {
               const seed = seedOf(playerId);
-              // A slot is interactable if it has a player, the match has no winner, AND we are NOT in readOnly mode.
               const isActive = playerId && !match.winnerId && !readOnly;
               const isRound1 = roundIdx === 0;
               const classes = `slot ${isActive ? 'interactable' : ''} ${isWinner ? 'winner' : ''}`;
@@ -1110,7 +1225,6 @@
                                       {seed && <span className="text-xs text-gray-500 mr-1 font-normal">#{seed}</span>}
                                       {nameOf(playerId)}
                                   </span>
-                                  {/* Only show Remove Button if Admin */}
                                   {isRound1 && !match.winnerId && !readOnly && (
                                       <button 
                                           onClick={(e) => { e.stopPropagation(); onUpdatePlayer(match.id, slotKey, null); }} 
@@ -1120,7 +1234,6 @@
                                   )}
                               </div>
                           ) : (
-                              /* Only show Add Dropdown if Admin */
                               isRound1 && !readOnly ? (
                                   <select 
                                       className="w-full h-full text-xs bg-transparent outline-none px-1 cursor-pointer text-gray-600"
@@ -1368,7 +1481,7 @@
             seedsById,
             bracket,
             championId: null,
-            championName: null, // New tracked field for Hall of Champions
+            championName: null, 
             goldStands: extractGoldStands(bracket),
             isArchived: false
           };
@@ -1382,6 +1495,14 @@
             setState(prev => ({
                 ...prev,
                 tournaments: prev.tournaments.map(t => t.id === tournamentId ? { ...t, isArchived: true } : t)
+            }));
+        }
+
+        function deleteTournament(tournamentId) {
+            if(!confirm("Permanently delete this bracket? This cannot be undone.")) return;
+            setState(prev => ({
+                ...prev,
+                tournaments: prev.tournaments.filter(t => t.id !== tournamentId)
             }));
         }
 
@@ -1500,7 +1621,6 @@
             const newChamp = finalMatch?.winnerId || null;
             const becameChampion = !!newChamp && !t.championId;
 
-            // Track Champion Name permanently in case student gets deleted later
             const newChampName = newChamp ? (students.find(s => s.id === newChamp)?.name || "Unknown") : null;
 
             const winnerSeed = t.seedsById?.[winnerId] ?? null;
@@ -1590,7 +1710,8 @@
                      </div>
                      <div className="flex gap-2">
                          {isAdmin && <Button onClick={() => archiveTournament(t.id)} className="font-bold border-yellow-600 text-yellow-700 bg-yellow-50">📁 Archive</Button>}
-                         {isAdmin && <Button onClick={() => reseedTournament(t.id)} className="font-bold border-red-600 text-red-700 bg-red-50">🔄 Reseed Tournament</Button>}
+                         {isAdmin && <Button onClick={() => deleteTournament(t.id)} className="font-bold border-red-600 text-red-700 bg-red-50">🗑️ Delete</Button>}
+                         {isAdmin && <Button onClick={() => reseedTournament(t.id)} className="font-bold border-orange-600 text-orange-700 bg-orange-50">🔄 Reseed Tournament</Button>}
                          <Button 
                              onClick={() => setFullscreenTournamentId(isFullscreen ? null : t.id)} 
                              className="font-bold border-purple-600 text-purple-700 bg-purple-50"
@@ -1632,16 +1753,108 @@
         );
       }
 
+      // ------------------------------------ Section Points ------------------------------------
+      function SectionPoints({ state, setState }) {
+        function add(section, delta) {
+          setState((prev) => ({
+            ...prev,
+            sectionPoints: { ...prev.sectionPoints, [section]: Math.max(0, (prev.sectionPoints[section] || 0) + delta) },
+          }));
+        }
+
+        function resetAll() {
+          if (!confirm("Reset all section points to zero?")) return;
+          const cleared = {};
+          INSTRUMENTS.forEach((i) => (cleared[i] = 0));
+          setState((prev) => ({ ...prev, sectionPoints: cleared }));
+        }
+
+        return (
+          <Card
+            title="Section Points"
+            actions={<Button className="border-red-600 text-red-700" onClick={resetAll}>Reset</Button>}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              {INSTRUMENTS.map((i) => (
+                <div key={i} className="border rounded-xl p-3">
+                  <div className="font-semibold mb-1">{i}</div>
+                  <div className="text-2xl mb-2">{state.sectionPoints[i] || 0}</div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => add(i, +1)}>+1</Button>
+                    <Button onClick={() => add(i, +5)}>+5</Button>
+                    <Button onClick={() => add(i, -1)}>-1</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        );
+      }
+
+      function BackupRestore({ state, setState }) {
+        function downloadJSON() {
+          const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          // IMPORTANT: Recommending data.json naming for easy cloud uploading
+          a.download = `data.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+
+        function onUpload(e) {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const text = String(reader.result || "{}");
+              const data = JSON.parse(text);
+              if (!data || typeof data !== "object") throw new Error("Invalid JSON");
+              setState(hydrateState(data));
+            } catch (err) {
+              alert("Failed to load backup: " + (err?.message || err));
+            }
+          };
+          reader.readAsText(file);
+        }
+
+        function clearAll() {
+          if (!confirm("Wipe all data? This cannot be undone.")) return;
+          setState(defaultState());
+        }
+
+        return (
+          <Card title="Backup / Restore / Cloud Sync" actions={null}>
+            <p className="text-sm text-gray-600 mb-4">
+                <strong>How to update the Public View on GitHub:</strong> Click "Export Cloud File" to download your data. Then, upload that exactly named <code>data.json</code> file to your GitHub repository. The public site will automatically fetch and display your newest changes!
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={downloadJSON} className="bg-green-600 text-white border-green-700 font-bold shadow-md">
+                  ☁️ Export Cloud File (data.json)
+              </Button>
+              <label className="px-3 py-2 rounded-2xl shadow-sm border bg-white hover:bg-gray-50 cursor-pointer">
+                Restore from JSON
+                <input type="file" accept="application/json" className="hidden" onChange={onUpload} />
+              </label>
+              <Button className="border-red-600 text-red-700" onClick={clearAll}>Wipe All Local Data</Button>
+            </div>
+          </Card>
+        );
+      }
+
       // ------------------------------------ App ------------------------------------
       function App() {
         const [state, setState] = usePersistentState();
         
         // --- The Divine Barrier (Admin vs Public) ---
-        // By default, everyone is Public when they load the page.
         const [isAdmin, setIsAdmin] = useState(false);
         const [tab, setTab] = useState("Live Brackets");
+        
+        // --- Certificate Print Mode ---
+        const [printCertFor, setPrintCertFor] = useState(null);
 
-        // Force to allowed tab when switching modes
         useEffect(() => {
             if (isAdmin && (tab === "Live Brackets" || tab === "Hall of Champions")) setTab("Tournaments");
             if (!isAdmin && tab !== "Live Brackets" && tab !== "Hall of Champions") setTab("Live Brackets");
@@ -1656,7 +1869,6 @@
                 setIsAdmin(false);
             } else {
                 const code = prompt("Enter Admin Passcode:");
-                // Default passcode. You may change "admin" to anything you desire.
                 if (code === "admin") {
                     setIsAdmin(true);
                 } else if (code !== null) {
@@ -1665,8 +1877,13 @@
             }
         }
 
+        // If rendering certificate, hijack entire view
+        if (printCertFor) {
+            return <CertificateView champName={printCertFor} onCancel={() => setPrintCertFor(null)} />;
+        }
+
         return (
-          <div className="min-h-screen text-gray-900">
+          <div className="min-h-screen text-gray-900 hide-on-cert-print">
             <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
               
               <div className="flex items-center justify-between no-print mb-4 border-b border-gray-200 pb-4">
@@ -1701,7 +1918,7 @@
               
               {/* Shared/Public Views */}
               {(tab === "Tournaments" || tab === "Live Brackets") && <Tournaments state={state} setState={setState} isAdmin={isAdmin} />}
-              {tab === "Hall of Champions" && <HallOfChampions state={state} />}
+              {tab === "Hall of Champions" && <HallOfChampions state={state} onPrintCert={setPrintCertFor} />}
 
             </div>
           </div>
