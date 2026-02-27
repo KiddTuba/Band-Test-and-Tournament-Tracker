@@ -1297,7 +1297,7 @@
 
             const winnerSeed = t.seedsById?.[winnerId] ?? null;
             const underdog = winnerSeed && winnerSeed > (t.size / 2);
-            const lateRound = newB.rounds[roundIndex]?.name === "Quarterfinals" || newB.rounds[roundIndex]?.name === "Semifinals";
+            const lateRound = newB.rounds[roundIndex]?.name === "Elite Eight" || newB.rounds[roundIndex]?.name === "Final Four";
 
             const updatedTournament = {
               ...t,
@@ -1535,4 +1535,5 @@
     </script>
   </body>
 </html>
+
 
