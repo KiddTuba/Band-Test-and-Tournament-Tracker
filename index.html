@@ -240,6 +240,18 @@
           text-overflow: ellipsis;
       }
 
+      .slot select {
+          width: 100%;
+          height: 100%;
+          border: none;
+          background: transparent;
+          font-size: 0.75rem;
+          padding: 0 4px;
+          cursor: pointer;
+          color: var(--dark-navy);
+          outline: none;
+      }
+
       /* --- Center Championship Area --- */
       .center-area {
           display: flex;
@@ -909,23 +921,34 @@
         return slots; 
       }
 
+      // EPICIALLY UPDATED NAMES
       function roundLabel(participants) {
         if (participants === 2) return "Championship Round";
-        if (participants === 4) return "Final Four";
-        if (participants === 8) return "Elite 8";
+        if (participants === 4) return "The Final Four";
+        if (participants === 8) return "Elite Eight";
         if (participants === 16) return "Sweet 16";
         if (participants === 32) return "Round of 32";
         if (participants === 64) return "Opening Round";
         return `Round of ${participants}`;
       }
 
-      function BracketView({ tournament, students, onSetWinner }) {
+      function BracketView({ tournament, students, onSetWinner, onUpdatePlayer }) {
           const { bracket, seedsById } = tournament;
           const rounds = bracket.rounds;
           const numRounds = rounds.length;
 
           const nameOf = (id) => students.find((s) => s.id === id)?.name || "—";
           const seedOf = (id) => (id ? (seedsById?.[id] ?? "") : "");
+
+          // Gather list of students not currently in round 1 to allow for manual additions
+          const currentIdsInR1 = new Set();
+          rounds[0]?.matches.forEach(m => {
+              if (m.p1Id) currentIdsInR1.add(m.p1Id);
+              if (m.p2Id) currentIdsInR1.add(m.p2Id);
+          });
+          const availableStudents = students
+            .filter(s => !currentIdsInR1.has(s.id))
+            .sort((a,b) => a.name.localeCompare(b.name));
 
           const leftCols = [];
           const rightCols = [];
@@ -944,20 +967,46 @@
           const finalMatch = rounds[numRounds - 1]?.matches[0];
           const championId = tournament.championId;
 
-          function renderSlot(match, playerId, isWinner) {
+          function renderSlot(match, playerId, isWinner, slotKey, roundIdx) {
               const seed = seedOf(playerId);
               // A slot is interactable if it has a player and the match has no winner yet.
-              // (This perfectly handles byes: the only player in a bye match can be clicked to advance!)
               const isActive = playerId && !match.winnerId;
+              const isRound1 = roundIdx === 0;
               const classes = `slot ${isActive ? 'interactable' : ''} ${isWinner ? 'winner' : ''}`;
               
               return (
                   <div className="slot-wrapper">
                       <div className={classes} onClick={() => isActive && onSetWinner(match.id, playerId)}>
-                          <div className="player">
-                              {seed && <span className="text-xs text-gray-500 mr-2 font-normal">#{seed}</span>}
-                              {nameOf(playerId)}
-                          </div>
+                          {playerId ? (
+                              <div className="player group flex justify-between items-center w-full">
+                                  <span className="truncate">
+                                      {seed && <span className="text-xs text-gray-500 mr-1 font-normal">#{seed}</span>}
+                                      {nameOf(playerId)}
+                                  </span>
+                                  {isRound1 && !match.winnerId && (
+                                      <button 
+                                          onClick={(e) => { e.stopPropagation(); onUpdatePlayer(match.id, slotKey, null); }} 
+                                          className="hidden group-hover:block text-red-500 font-bold px-1 hover:text-red-700 bg-white/80 rounded"
+                                          title="Remove Player"
+                                      >×</button>
+                                  )}
+                              </div>
+                          ) : (
+                              isRound1 ? (
+                                  <select 
+                                      className="w-full h-full text-xs bg-transparent outline-none px-1 cursor-pointer text-gray-600"
+                                      onChange={(e) => onUpdatePlayer(match.id, slotKey, e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      value=""
+                                  >
+                                      <option value="" disabled hidden>+ Add Player</option>
+                                      <option value="">-- Leave Empty --</option>
+                                      {availableStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                  </select>
+                              ) : (
+                                  <div className="player text-gray-400 italic">TBD</div>
+                              )
+                          )}
                       </div>
                   </div>
               );
@@ -968,7 +1017,7 @@
                   {/* Headers */}
                   <div className="bracket-headers">
                       {leftCols.map((c, i) => <div key={`lh-${i}`} className="h-col">{c.label}</div>)}
-                      <div className="h-col center">Championship</div>
+                      <div className="h-col center">Championship Round</div>
                       {rightCols.map((c, i) => <div key={`rh-${i}`} className="h-col">{c.label}</div>)}
                   </div>
 
@@ -984,8 +1033,8 @@
                           <div key={`lcol-${cIdx}`} className={`column left-side ${cIdx === leftCols.length - 1 ? 'no-lines' : ''}`}>
                               {col.matches.map((m, mIdx) => (
                                   <div key={m.id} className="matchup">
-                                      {renderSlot(m, m.p1Id, m.winnerId === m.p1Id)}
-                                      {renderSlot(m, m.p2Id, m.winnerId === m.p2Id)}
+                                      {renderSlot(m, m.p1Id, m.winnerId === m.p1Id, 'p1Id', col.roundIdx)}
+                                      {renderSlot(m, m.p2Id, m.winnerId === m.p2Id, 'p2Id', col.roundIdx)}
                                   </div>
                               ))}
                           </div>
@@ -996,9 +1045,9 @@
                           {finalMatch && (
                             <div className="center-area mt-16">
                                 <div className="championship-row">
-                                    {renderSlot(finalMatch, finalMatch.p1Id, finalMatch.winnerId === finalMatch.p1Id)}
+                                    {renderSlot(finalMatch, finalMatch.p1Id, finalMatch.winnerId === finalMatch.p1Id, 'p1Id', numRounds - 1)}
                                     <div className="vs-text">VS</div>
-                                    {renderSlot(finalMatch, finalMatch.p2Id, finalMatch.winnerId === finalMatch.p2Id)}
+                                    {renderSlot(finalMatch, finalMatch.p2Id, finalMatch.winnerId === finalMatch.p2Id, 'p2Id', numRounds - 1)}
                                 </div>
                                 <div className="champion-connector-horizontal"></div>
                                 <div className="champion-connector-vertical"></div>
@@ -1006,7 +1055,7 @@
                                     <div className="slot">
                                         {championId ? nameOf(championId) : ""}
                                     </div>
-                                    <div className="champ-label">Champion of the World</div>
+                                    <div className="champ-label">🏆 Championship Belt Winner 🏆</div>
                                 </div>
                             </div>
                           )}
@@ -1017,8 +1066,8 @@
                           <div key={`rcol-${cIdx}`} className={`column right-side ${cIdx === 0 ? 'no-lines' : ''}`}>
                               {col.matches.map((m, mIdx) => (
                                   <div key={m.id} className="matchup">
-                                      {renderSlot(m, m.p1Id, m.winnerId === m.p1Id)}
-                                      {renderSlot(m, m.p2Id, m.winnerId === m.p2Id)}
+                                      {renderSlot(m, m.p1Id, m.winnerId === m.p1Id, 'p1Id', col.roundIdx)}
+                                      {renderSlot(m, m.p2Id, m.winnerId === m.p2Id, 'p2Id', col.roundIdx)}
                                   </div>
                               ))}
                           </div>
@@ -1069,8 +1118,9 @@
             ? students.filter(s => s.instrument === instrumentFilter)
             : students;
 
+          // EPIC CHANGE: Filter to ONLY those with an 8.5 or higher score!
           const entries = Object.entries(test?.scores || {})
-            .filter(([, sc]) => sc !== null && sc !== "")
+            .filter(([, sc]) => sc !== null && sc !== "" && Number(sc) >= 8.5)
             .map(([studentId, sc]) => ({ studentId, score: Number(sc), instrument: students.find(s=>s.id===studentId)?.instrument }))
             .filter(e => pool.some(s => s.id === e.studentId))
             .sort((a, b) => b.score - a.score);
@@ -1217,6 +1267,44 @@
           playSound("tournamentStart");
         }
 
+        function reseedTournament(tournamentId) {
+            if (!confirm("Are you sure you want to reseed? This will completely wipe this bracket's progress and re-pull the 8.5+ scores from the Chair Test.")) return;
+            setState((prev) => {
+                const t = prev.tournaments.find((x) => x.id === tournamentId);
+                const test = prev.chairTests.find((x) => x.id === t.testId);
+                if (!test) return prev;
+                const { bracket, seedsById } = buildRegionalBracket(test, prev.students, t.instrument === "All" ? "" : t.instrument, t.size);
+                return {
+                    ...prev,
+                    tournaments: prev.tournaments.map((x) => 
+                        x.id === tournamentId ? { ...x, bracket, seedsById, championId: null, goldStands: [] } : x
+                    )
+                };
+            });
+        }
+
+        function updateMatchPlayer(tournamentId, matchId, slotKey, newPlayerId) {
+            setState((prev) => {
+                const t = prev.tournaments.find((x) => x.id === tournamentId);
+                if (!t) return prev;
+                const b = structuredClone(t.bracket);
+                const match = b.rounds[0].matches.find((m) => m.id === matchId);
+                if (match) {
+                    match[slotKey] = newPlayerId || null;
+                    if (match.winnerId && match.winnerId !== match.p1Id && match.winnerId !== match.p2Id) {
+                        match.winnerId = null;
+                        match.award = null;
+                    }
+                }
+                const newB = propagateWinners(b);
+                const updatedTournament = { ...t, bracket: newB, goldStands: extractGoldStands(newB) };
+                return {
+                    ...prev,
+                    tournaments: prev.tournaments.map((x) => x.id === tournamentId ? updatedTournament : x)
+                };
+            });
+        }
+
         function awardForMatch({ tournament, roundIndex, winnerId, loserId }) {
           const base = Number(state.settings?.bucksPerRound ?? 10) * (roundIndex + 1);
           const bonusPerSeed = Number(state.settings?.underdogBonusPerSeed ?? 0);
@@ -1297,7 +1385,7 @@
 
             const winnerSeed = t.seedsById?.[winnerId] ?? null;
             const underdog = winnerSeed && winnerSeed > (t.size / 2);
-            const lateRound = newB.rounds[roundIndex]?.name === "Elite Eight" || newB.rounds[roundIndex]?.name === "Final Four";
+            const lateRound = newB.rounds[roundIndex]?.name === "Quarterfinals" || newB.rounds[roundIndex]?.name === "Semifinals";
 
             const updatedTournament = {
               ...t,
@@ -1355,7 +1443,7 @@
                 </div>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                * Note: Auto-Seed automatically groups students by section and evenly distributes them across the 4 Regions (No Cap, Aura, Vibe Check, Goated) to prevent early matchups between the same instruments.
+                * Note: Auto-Seed automatically pulls students who scored <strong>8.5 or higher</strong>, groups them by section, and evenly distributes them across the 4 Regions (No Cap, Aura, Vibe Check, Goated) to prevent early matchups between the same instruments. You can manually fill empty slots later if you desire.
               </p>
             </Card>
 
@@ -1378,6 +1466,7 @@
                          {t.date} • {t.size}-Seed Bracket
                      </div>
                      <div className="flex gap-2">
+                         <Button onClick={() => reseedTournament(t.id)} className="font-bold border-red-600 text-red-700 bg-red-50">🔄 Reseed Tournament</Button>
                          <Button 
                              onClick={() => setFullscreenTournamentId(isFullscreen ? null : t.id)} 
                              className="font-bold border-purple-600 text-purple-700 bg-purple-50"
@@ -1394,6 +1483,7 @@
                         tournament={t}
                         students={state.students}
                         onSetWinner={(matchId, winnerId) => setWinner(t.id, matchId, winnerId)}
+                        onUpdatePlayer={(matchId, slotKey, newPlayerId) => updateMatchPlayer(t.id, matchId, slotKey, newPlayerId)}
                       />
                   </div>
 
@@ -1535,5 +1625,3 @@
     </script>
   </body>
 </html>
-
-
