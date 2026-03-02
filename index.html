@@ -336,10 +336,8 @@
           .bracket-headers .h-col { color: var(--dark-navy); background: transparent !important; }
           .region-watermark { opacity: 0.08; }
           
-          /* Force landscape for general printing, certificate handles its own logic if needed */
           @page { size: landscape; margin: 0.5cm; }
           
-          /* Certificate Specific Print Classes */
           .print-cert-only { display: flex !important; }
           .hide-on-cert-print { display: none !important; }
       }
@@ -358,6 +356,7 @@
   <body>
     <div id="root"></div>
 
+    <!-- React 18 UMD + Babel for in‑browser JSX -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -609,6 +608,15 @@
           }));
         }
 
+        function setExactBandBucks(id, val) {
+            const amount = parseInt(val, 10);
+            if(isNaN(amount)) return;
+            setState((prev) => ({
+                ...prev,
+                students: prev.students.map(s => s.id === id ? { ...s, bandBucks: Math.max(0, amount) } : s)
+            }));
+        }
+
         return (
           <Card title="Students" actions={<div className="flex gap-2"><Select value={filterInstrument} onChange={(e) => setFilterInstrument(e.target.value)}><option value="">All Instruments</option>{INSTRUMENTS.map((i) => <option key={i} value={i}>{i}</option>)}</Select><Input placeholder="Search name…" value={q} onChange={(e) => setQ(e.target.value)} /></div>}>
             <Section title="Add Student">
@@ -626,7 +634,15 @@
                     <tr key={s.id} className="border-t">
                       <td className="py-2 pr-4 font-medium"><div onClick={() => playSound(state.settings?.clickSongKey || "betweenRoundsA")} className="cursor-pointer hover:text-blue-600">{s.name}</div></td>
                       <td className="py-2 pr-4">{s.instrument}</td>
-                      <td className="py-2 pr-4 font-bold text-green-700">${s.bandBucks || 0}</td>
+                      <td className="py-2 pr-4 font-bold text-green-700 flex items-center">
+                          $
+                          <input 
+                              type="number" 
+                              value={s.bandBucks || 0}
+                              onChange={(e) => setExactBandBucks(s.id, e.target.value)}
+                              className="w-20 px-2 border rounded ml-1 focus:outline-none focus:border-green-500 bg-transparent shadow-inner"
+                          />
+                      </td>
                       <td className="py-2 pr-4"><div className="flex gap-2"><Button onClick={() => setBandBucks(s.id, +1)}>+1</Button><Button onClick={() => setBandBucks(s.id, +10)}>+10</Button><Button onClick={() => setBandBucks(s.id, -1)}>-1</Button><Button className="border-red-600 text-red-700" onClick={() => removeStudent(s.id)}>Remove</Button></div></td>
                     </tr>
                   ))}
@@ -734,7 +750,6 @@
 
             setState(prev => {
                 const updatedStudents = [...prev.students];
-                let payoutCount = 0;
                 
                 Object.entries(test.scores || {}).forEach(([sId, scoreVal]) => {
                     const score = Number(scoreVal);
@@ -746,7 +761,6 @@
                         const sIdx = updatedStudents.findIndex(s => s.id === sId);
                         if (sIdx !== -1) {
                             updatedStudents[sIdx] = { ...updatedStudents[sIdx], bandBucks: (updatedStudents[sIdx].bandBucks || 0) + bonus };
-                            payoutCount++;
                         }
                     }
                 });
@@ -799,6 +813,226 @@
             ))}
           </div>
         );
+      }
+
+      // ------------------------------------ Chairs Manager (Admin) ------------------------------------
+      function ChairsManager({ state, setState }) {
+        const [selectedTestId, setSelectedTestId] = useState("");
+        const [selectedTourneyId, setSelectedTourneyId] = useState("");
+
+        const tests = (state.chairTests || []).filter(t => !t.isArchived);
+        const tourneys = (state.tournaments || []).filter(t => !t.isArchived && t.testId === selectedTestId);
+
+        useEffect(() => {
+          if (!selectedTestId && tests.length > 0) setSelectedTestId(tests[0].id);
+        }, [tests]);
+
+        function handleGenerate() {
+            if (!selectedTestId) return alert("Please select a Base Chair Test first.");
+            
+            const test = state.chairTests.find(t => t.id === selectedTestId);
+            const tourney = state.tournaments.find(t => t.id === selectedTourneyId);
+            
+            const newOrders = {};
+            INSTRUMENTS.forEach(inst => {
+                const instStudents = state.students.filter(s => s.instrument === inst);
+                let rankedIds = [];
+                
+                if (!tourney) {
+                    rankedIds = instStudents
+                        .map(s => ({ id: s.id, score: Number(test?.scores?.[s.id] || 0) }))
+                        .sort((a,b) => b.score - a.score)
+                        .map(x => x.id);
+                } else {
+                    const roundReached = {};
+                    tourney.bracket.rounds.forEach((round, rIdx) => {
+                        round.matches.forEach(m => {
+                            if (m.p1Id) roundReached[m.p1Id] = rIdx;
+                            if (m.p2Id) roundReached[m.p2Id] = rIdx;
+                            if (m.winnerId) roundReached[m.winnerId] = rIdx + 1; 
+                        });
+                    });
+                    
+                    const tourneyPlayers = instStudents.filter(s => roundReached[s.id] !== undefined);
+                    const nonTourney = instStudents.filter(s => roundReached[s.id] === undefined);
+                    
+                    tourneyPlayers.sort((a,b) => {
+                        if (roundReached[b.id] !== roundReached[a.id]) return roundReached[b.id] - roundReached[a.id];
+                        return Math.random() - 0.5; // Tiebreaker
+                    });
+                    
+                    nonTourney.sort((a,b) => Number(test?.scores?.[b.id] || 0) - Number(test?.scores?.[a.id] || 0));
+                    rankedIds = [...tourneyPlayers.map(s=>s.id), ...nonTourney.map(s=>s.id)];
+                }
+                newOrders[inst] = rankedIds;
+            });
+            
+            setState(prev => ({ ...prev, chairOrders: newOrders }));
+        }
+
+        function moveChair(inst, index, direction) {
+            setState(prev => {
+                const arr = [...(prev.chairOrders[inst] || [])];
+                if (direction === 'up' && index > 0) {
+                    [arr[index-1], arr[index]] = [arr[index], arr[index-1]];
+                } else if (direction === 'down' && index < arr.length - 1) {
+                    [arr[index+1], arr[index]] = [arr[index], arr[index+1]];
+                }
+                return { ...prev, chairOrders: { ...prev.chairOrders, [inst]: arr } };
+            });
+        }
+
+        return (
+           <div className="space-y-6">
+               <Card title="Auto-Generate Chair Order">
+                   <div className="flex flex-col md:flex-row gap-4 items-end">
+                       <div className="w-full">
+                           <label className="block text-sm font-bold text-[#002147] mb-1">Base Chair Test</label>
+                           <Select value={selectedTestId} onChange={(e) => { setSelectedTestId(e.target.value); setSelectedTourneyId(""); }}>
+                               <option value="">-- Select Test --</option>
+                               {tests.map(t => <option key={t.id} value={t.id}>{t.name} ({t.date})</option>)}
+                           </Select>
+                       </div>
+                       <div className="w-full">
+                           <label className="block text-sm font-bold text-[#002147] mb-1">Associated Tournament (Optional)</label>
+                           <Select value={selectedTourneyId} onChange={(e) => setSelectedTourneyId(e.target.value)}>
+                               <option value="">-- No Tournament (Score Only) --</option>
+                               {tourneys.map(t => <option key={t.id} value={t.id}>{t.name} ({t.date})</option>)}
+                           </Select>
+                       </div>
+                       <Button onClick={handleGenerate} className="bg-[#002147] text-white font-bold whitespace-nowrap px-6">⚡ Auto-Generate</Button>
+                   </div>
+                   <p className="text-xs text-gray-500 mt-3">
+                       <strong>Logic:</strong> Tournament participants rank highest based on how far they made it. Non-participants are placed underneath based on their chair test score.
+                   </p>
+               </Card>
+
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+                    {INSTRUMENTS.map(inst => {
+                        const order = state.chairOrders[inst] || [];
+                        return (
+                            <div key={inst} className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-t-[#7BAFD4]">
+                                <h3 className="font-black text-[#002147] text-xl mb-3 border-b pb-2 uppercase tracking-wide">{inst}</h3>
+                                {order.length === 0 ? <p className="text-gray-400 italic text-sm">No chairs set.</p> : (
+                                    <div className="flex flex-col gap-2">
+                                        {order.map((id, idx) => {
+                                            const s = state.students.find(x => x.id === id);
+                                            if (!s) return null;
+                                            return (
+                                                <div key={id} className="flex justify-between items-center bg-gray-50 p-2 rounded border hover:bg-gray-100 transition">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-black text-gray-400 w-8 text-right text-lg">#{idx+1}</span>
+                                                        <span className="font-bold text-[#002147]">{s.name}</span>
+                                                    </div>
+                                                    <div className="flex gap-1 no-print">
+                                                        <Button onClick={() => moveChair(inst, idx, 'up')} disabled={idx === 0} className="px-2 py-1 text-xs bg-white text-gray-600">▲</Button>
+                                                        <Button onClick={() => moveChair(inst, idx, 'down')} disabled={idx === order.length - 1} className="px-2 py-1 text-xs bg-white text-gray-600">▼</Button>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+           </div>
+        );
+      }
+
+      // ------------------------------------ Public Chairs View ------------------------------------
+      function PublicChairs({ state }) {
+          return (
+              <div className="space-y-6">
+                  <div className="w-full bg-gradient-to-r from-[#002147] to-[#001530] text-white p-6 rounded-2xl shadow-lg border-b-4 border-[#7BAFD4] flex flex-col items-center justify-center text-center">
+                      <h1 className="text-4xl italic font-black uppercase tracking-wider text-shadow-md mb-2">Official Chair Order</h1>
+                      <p className="text-blue-300 font-bold tracking-wide uppercase text-sm">Whippet Barking Battalion Rankings</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {INSTRUMENTS.map(inst => {
+                        const order = state.chairOrders[inst] || [];
+                        if (order.length === 0) return null;
+                        
+                        return (
+                            <div key={inst} className="bg-white rounded-xl shadow-md border-2 border-[#002147] overflow-hidden">
+                                <div className="bg-[#002147] text-white p-3 text-center">
+                                    <h3 className="text-xl font-black uppercase tracking-widest">{inst}</h3>
+                                </div>
+                                <div className="p-0">
+                                    {order.map((id, idx) => {
+                                        const s = state.students.find(x => x.id === id);
+                                        if (!s) return null;
+                                        return (
+                                            <div key={id} className={`flex items-center px-4 py-3 border-b last:border-b-0 ${idx === 0 ? 'bg-[#FFFDF0] font-black' : 'bg-white font-bold text-gray-700'}`}>
+                                                <div className={`w-10 text-right mr-4 ${idx===0 ? 'text-yellow-600 text-xl' : 'text-gray-400'}`}>
+                                                    #{idx+1}
+                                                </div>
+                                                <div className="text-lg uppercase tracking-wide">
+                                                    {s.name}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )
+                    })}
+                  </div>
+              </div>
+          )
+      }
+
+      // ------------------------------------ Archives ------------------------------------
+      function Archives({ state, setState }) {
+          const archivedTests = (state.chairTests || []).filter(t => t.isArchived);
+          const archivedTournaments = (state.tournaments || []).filter(t => t.isArchived);
+
+          function restoreTest(id) { setState(prev => ({ ...prev, chairTests: prev.chairTests.map(t => t.id === id ? { ...t, isArchived: false } : t) })); }
+          function deleteTest(id) { if(confirm("Permanently delete?")) setState(prev => ({ ...prev, chairTests: prev.chairTests.filter(t => t.id !== id) })); }
+          function restoreTournament(id) { setState(prev => ({ ...prev, tournaments: prev.tournaments.map(t => t.id === id ? { ...t, isArchived: false } : t) })); }
+          function deleteTournament(id) { if(confirm("Permanently delete?")) setState(prev => ({ ...prev, tournaments: prev.tournaments.filter(t => t.id !== id) })); }
+
+          return (
+              <div className="space-y-6">
+                  <Card title="Archived Tournaments">
+                      {archivedTournaments.length === 0 && <p className="text-sm text-gray-500">No archived tournaments.</p>}
+                      <div className="space-y-2">
+                          {archivedTournaments.map(t => (
+                              <div key={t.id} className="flex justify-between items-center p-3 border rounded">
+                                  <div>
+                                      <div className="font-bold text-gray-800">{t.name}</div>
+                                      <div className="text-xs text-gray-500">{t.date} • {t.size}-Seed • Champion: {t.championName || 'None'}</div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                      <Button onClick={() => restoreTournament(t.id)} className="text-blue-600">Restore</Button>
+                                      <Button onClick={() => deleteTournament(t.id)} className="text-red-600 border-red-200">Delete</Button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  </Card>
+
+                  <Card title="Archived Chair Tests">
+                      {archivedTests.length === 0 && <p className="text-sm text-gray-500">No archived chair tests.</p>}
+                      <div className="space-y-2">
+                          {archivedTests.map(t => (
+                              <div key={t.id} className="flex justify-between items-center p-3 border rounded">
+                                  <div>
+                                      <div className="font-bold text-gray-800">{t.name}</div>
+                                      <div className="text-xs text-gray-500">{t.date}</div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                      <Button onClick={() => restoreTest(t.id)} className="text-blue-600">Restore</Button>
+                                      <Button onClick={() => deleteTest(t.id)} className="text-red-600 border-red-200">Delete</Button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  </Card>
+              </div>
+          )
       }
 
       // ------------------------------------ Hall of Champions ------------------------------------
@@ -878,12 +1112,9 @@
             const a = cur[2 * i];
             const c = cur[2 * i + 1];
             
-            // Logic: If p1 matches the winner of the previous round, good.
-            // If the previous round's winner changed, we must update p1.
             nxt[i].p1Id = a ? (a.winnerId || null) : null;
             nxt[i].p2Id = c ? (c.winnerId || null) : null;
 
-            // Integrity check: If current winner is no longer a participant, clear winner
             if (nxt[i].winnerId && nxt[i].winnerId !== nxt[i].p1Id && nxt[i].winnerId !== nxt[i].p2Id) {
               nxt[i].winnerId = null;
               nxt[i].award = null;
@@ -904,12 +1135,12 @@
           regions.forEach(r => { while(r.length < target) r.push(null); });
           function getPairs(reg) {
               const matches = []; const pairs = seededSlotOrder(target);
-              for(let i=0; i<pairs.length; i+=2) matches.push({ id: uid(), p1Id: reg[pairs[i]-1]?.studentId || null, p2Id: reg[pairs[i+1]-1]?.studentId || null, winnerId: null });
+              for(let i=0; i<pairs.length; i+=2) matches.push({ id: uid(), p1Id: reg[pairs[i]-1]?.studentId || null, p2Id: reg[pairs[i+1]-1]?.studentId || null, winnerId: null, award: null });
               return matches;
           }
           const round1 = [ ...getPairs(regions[0]), ...getPairs(regions[1]), ...getPairs(regions[2]), ...getPairs(regions[3]) ];
           const rounds = [{ name: size === 64 ? "Opening Round" : "Round 1", matches: round1 }];
-          let p = size / 2; while (p >= 2) { if(p===1) break; rounds.push({ name: p===2?"Championship Round":p===4?"The Final Four":p===8?"Elite Eight":`Round of ${p}`, matches: Array.from({ length: p/2 }, () => ({ id: uid(), p1Id: null, p2Id: null, winnerId: null })) }); p = p / 2; }
+          let p = size / 2; while (p >= 2) { if(p===1) break; rounds.push({ name: p===2?"Championship Round":p===4?"The Final Four":p===8?"Elite Eight":`Round of ${p}`, matches: Array.from({ length: p/2 }, () => ({ id: uid(), p1Id: null, p2Id: null, winnerId: null, award: null })) }); p = p / 2; }
           const seedsById = {}; entries.forEach((e, idx) => seedsById[e.studentId] = idx + 1);
           return { bracket: propagateWinners({ size, rounds }), seedsById };
       }
@@ -928,9 +1159,6 @@
         rightCols.reverse();
         const finalMatch = rounds[rounds.length - 1].matches[0];
 
-        // Helper to determine if we can edit a slot
-        // In this version, Admin can edit Round 1 slots ALWAYS, even if winner declared.
-        // Logic handles the propagation.
         const canEditSlot = (roundIdx) => !readOnly && roundIdx === 0;
 
         const renderSlot = (match, playerId, isWinner, slotKey, roundIdx) => {
@@ -948,6 +1176,7 @@
                                     {canEditSlot(roundIdx) && (
                                         <select className="absolute inset-0 opacity-0 cursor-pointer" value="" onChange={(e) => onUpdatePlayer(match.id, slotKey, e.target.value)}>
                                             <option value="">Change Player...</option>
+                                            <option value="">-- Remove Player --</option>
                                             {students.sort((a,b)=>a.name.localeCompare(b.name)).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                         </select>
                                     )}
@@ -1006,23 +1235,17 @@
                 const match = b.rounds[0].matches.find(m => m.id === matchId);
                 
                 if (match) {
-                    // Logic for Mid-Tournament Swap
                     const oldPlayerId = match[slotKey];
                     const wasWinner = match.winnerId === oldPlayerId;
-                    
                     match[slotKey] = newPlayerId || null;
-                    
-                    // If the person I'm swapping OUT was the winner, the new person inherits the win
                     if (wasWinner) {
                         match.winnerId = newPlayerId; 
                     } else if (match.winnerId && match.winnerId !== match.p1Id && match.winnerId !== match.p2Id) {
-                        // Integrity check: if winner ID doesn't match either player, reset
                         match.winnerId = null;
-                        match.award = null;
+                        match.award = null; // Also clear award ledger for integrity
                     }
                 }
                 
-                // Propagate: This will push the new winnerId up the tree if they had won previous rounds
                 const newB = propagateWinners(b);
                 const finalMatch = newB.rounds[newB.rounds.length - 1].matches[0];
                 const newChamp = finalMatch?.winnerId || null;
@@ -1038,23 +1261,34 @@
                 if (!t) return prev;
                 const b = structuredClone(t.bracket);
                 let roundIndex = -1, match = null;
-                for (let r = 0; r < b.rounds.length; r++) { const m = b.rounds[r].matches.find(x => x.id === matchId); if (m) { roundIndex = r; match = m; break; } }
+                
+                for (let r = 0; r < b.rounds.length; r++) { 
+                    const m = b.rounds[r].matches.find(x => x.id === matchId); 
+                    if (m) { roundIndex = r; match = m; break; } 
+                }
+                
                 if (!match || match.winnerId === winnerId) return prev;
+
+                // Grab previous ledger before overwriting
+                const oldWinner = match.winnerId;
+                const oldAwardAmt = match.award?.amount || 0;
+
+                let updatedStudents = [...prev.students];
+
+                // Deduct from old winner if fixing a mistake
+                if (oldWinner && oldAwardAmt > 0) {
+                    updatedStudents = updatedStudents.map(s => 
+                        s.id === oldWinner ? { ...s, bandBucks: Math.max(0, (s.bandBucks || 0) - oldAwardAmt) } : s
+                    );
+                }
 
                 match.winnerId = winnerId;
                 const newB = propagateWinners(b);
                 const finalMatch = newB.rounds[newB.rounds.length - 1].matches[0];
                 const newChamp = finalMatch?.winnerId || null;
 
-                // --- BAND BUCKS LOGIC ---
-                // 1. Base Win = 10
-                // 2. Elite 8 Bonus = +8
-                // 3. Final 4 Bonus = +40
-                // 4. Finals Bonus = +50
-                // 5. Champion Bonus = +100
-                // 6. Upset (Lower seed beats higher) logic handled implicitly? User asked for lower seed bonus.
-                
-                let award = 10; // Base
+                // --- Calculate New Bucks ---
+                let award = 10; // Base win
                 const nextRoundName = newB.rounds[roundIndex + 1]?.name;
                 const isChampion = !!newChamp && !t.championId;
 
@@ -1063,19 +1297,39 @@
                 if (nextRoundName === "Championship Round") award += 50;
                 if (isChampion) award += 100;
 
-                // Upset Logic
                 const wSeed = t.seedsById?.[winnerId];
-                const lSeed = t.seedsById?.[match.p1Id === winnerId ? match.p2Id : match.p1Id];
-                if (wSeed && lSeed && wSeed > lSeed) {
-                    award += (wSeed - lSeed) * 2; // Keep existing upset multiplier
-                }
+                const loserId = match.p1Id === winnerId ? match.p2Id : match.p1Id;
+                const lSeed = t.seedsById?.[loserId];
                 
-                const updatedStudents = prev.students.map(s => s.id === winnerId ? { ...s, bandBucks: (s.bandBucks || 0) + award } : s);
+                if (wSeed && lSeed && wSeed > lSeed) {
+                    award += (wSeed - lSeed) * 2; 
+                }
+
+                // Save to ledger
+                match.award = { winnerId, amount: award };
+                
+                // Add to new winner
+                if (winnerId && award > 0) {
+                    updatedStudents = updatedStudents.map(s => 
+                        s.id === winnerId ? { ...s, bandBucks: (s.bandBucks || 0) + award } : s
+                    );
+                }
                 
                 if (isChampion) playSound("victory");
                 else if (nextRoundName === "The Final Four") playSound("deepRun");
 
-                return { ...prev, students: updatedStudents, tournaments: prev.tournaments.map(x => x.id === tournamentId ? { ...x, bracket: newB, championId: newChamp, championName: newChamp ? updatedStudents.find(s=>s.id===newChamp).name : null } : x) };
+                return { 
+                    ...prev, 
+                    students: updatedStudents, 
+                    tournaments: prev.tournaments.map(x => 
+                        x.id === tournamentId ? { 
+                            ...x, 
+                            bracket: newB, 
+                            championId: newChamp, 
+                            championName: newChamp ? updatedStudents.find(s=>s.id===newChamp)?.name : null 
+                        } : x
+                    ) 
+                };
             });
         }
 
@@ -1084,8 +1338,13 @@
                 {isAdmin && (
                     <Card title="Start New Band Madness">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                            <Select value={selectedTestId} onChange={(e) => setSelectedTestId(e.target.value)}><option value="">Seed from Chair Test...</option>{tests.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</Select>
-                            <Select value={String(size)} onChange={(e) => setSize(Number(e.target.value))}>{TOURNAMENT_SIZES.map(n => <option key={n} value={String(n)}>{n}-Seed</option>)}</Select>
+                            <Select value={selectedTestId} onChange={(e) => setSelectedTestId(e.target.value)}>
+                                <option value="">Seed from Chair Test...</option>
+                                {tests.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </Select>
+                            <Select value={String(size)} onChange={(e) => setSize(Number(e.target.value))}>
+                                {TOURNAMENT_SIZES.map(n => <option key={n} value={String(n)}>{n}-Seed</option>)}
+                            </Select>
                             <Input placeholder="Tournament Name" value={name} onChange={(e) => setName(e.target.value)} />
                             <Button onClick={createTournament} className="bg-blue-600 text-white border-blue-600 font-bold">Auto Seed & Create</Button>
                         </div>
@@ -1125,15 +1384,14 @@
         }
 
         const tabs = isAdmin 
-            ? ["Students", "Band Store", "Chair Tests", "Tournaments", "Archives"] 
-            : ["Live Brackets", "Hall of Champions"];
+            ? ["Students", "Band Store", "Chair Tests", "Chairs", "Tournaments", "Archives"] 
+            : ["Live Brackets", "Public Chairs", "Hall of Champions"];
 
         useEffect(() => {
              if (isAdmin && !tabs.includes(tab)) setTab("Tournaments");
              if (!isAdmin && !tabs.includes(tab)) setTab("Live Brackets");
         }, [isAdmin]);
 
-        // Certificate View Component (Inline)
         if (printCertFor) {
             return (
                 <div className="fixed inset-0 z-[100000] bg-gray-200 overflow-y-auto flex justify-center p-8 no-print-bg">
@@ -1170,13 +1428,11 @@
               {isAdmin && tab === "Students" && <StudentsManager state={state} setState={setState} />}
               {isAdmin && tab === "Band Store" && <BandStore state={state} setState={setState} />}
               {isAdmin && tab === "Chair Tests" && <ChairTests state={state} setState={setState} />}
+              {isAdmin && tab === "Chairs" && <ChairsManager state={state} setState={setState} />}
               {(tab === "Tournaments" || tab === "Live Brackets") && <Tournaments state={state} setState={setState} isAdmin={isAdmin} />}
+              {tab === "Public Chairs" && <PublicChairs state={state} />}
               {tab === "Hall of Champions" && <HallOfChampions state={state} onPrintCert={setPrintCertFor} />}
-              
-              {/* Archives not shown fully in this snippet to save space but logic persists */}
-              {isAdmin && tab === "Archives" && (
-                  <Card title="Archives"><p>Archived items are stored safely. Restore them via the raw JSON if needed or contact support.</p></Card>
-              )}
+              {isAdmin && tab === "Archives" && <Archives state={state} setState={setState} />}
             </div>
           </div>
         );
