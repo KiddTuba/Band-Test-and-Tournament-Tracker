@@ -1054,7 +1054,7 @@
           )
       }
 
-      // ------------------------------------ Archives ------------------------------------
+      // ------------------------------------ Archives & Data ------------------------------------
       function Archives({ state, setState, activeEnsemble }) {
           const archivedTests = (state.chairTests || []).filter(t => t.isArchived && t.ensemble === activeEnsemble);
           const archivedTournaments = (state.tournaments || []).filter(t => t.isArchived && t.ensemble === activeEnsemble);
@@ -1063,6 +1063,21 @@
           function deleteTest(id) { if(confirm("Permanently delete?")) setState(prev => ({ ...prev, chairTests: prev.chairTests.filter(t => t.id !== id) })); }
           function restoreTournament(id) { setState(prev => ({ ...prev, tournaments: prev.tournaments.map(t => t.id === id ? { ...t, isArchived: false } : t) })); }
           function deleteTournament(id) { if(confirm("Permanently delete?")) setState(prev => ({ ...prev, tournaments: prev.tournaments.filter(t => t.id !== id) })); }
+
+          const [migrateFrom, setMigrateFrom] = useState(ENSEMBLES[2]);
+          const [migrateTo, setMigrateTo] = useState(ENSEMBLES[0]);
+
+          function handleMassMigrate() {
+              if (migrateFrom === migrateTo) return alert("Please select two different ensembles.");
+              if (!confirm(`Are you sure you want to mass migrate ALL Chair Tests and Tournaments from ${migrateFrom} to ${migrateTo}?`)) return;
+
+              setState(prev => ({
+                  ...prev,
+                  chairTests: prev.chairTests.map(t => t.ensemble === migrateFrom ? { ...t, ensemble: migrateTo } : t),
+                  tournaments: prev.tournaments.map(t => t.ensemble === migrateFrom ? { ...t, ensemble: migrateTo } : t)
+              }));
+              alert(`Successfully migrated data from ${migrateFrom} to ${migrateTo}!`);
+          }
 
           return (
               <div className="space-y-6">
@@ -1099,6 +1114,26 @@
                                   </div>
                               </div>
                           ))}
+                      </div>
+                  </Card>
+
+                  <Card title="Mass Migrate Data">
+                      <p className="text-sm text-gray-500 mb-4">Move all Chair Tests and Tournaments from one ensemble to another. Useful if data was accidentally created under the wrong group.</p>
+                      <div className="flex flex-col md:flex-row gap-4 items-end">
+                          <div className="w-full">
+                              <label className="block text-sm font-bold text-[#002147] mb-1">From Ensemble</label>
+                              <Select value={migrateFrom} onChange={(e) => setMigrateFrom(e.target.value)}>
+                                  {ENSEMBLES.map(e => <option key={e} value={e}>{e}</option>)}
+                              </Select>
+                          </div>
+                          <div className="text-2xl mb-2 hidden md:block">➡️</div>
+                          <div className="w-full">
+                              <label className="block text-sm font-bold text-[#002147] mb-1">To Ensemble</label>
+                              <Select value={migrateTo} onChange={(e) => setMigrateTo(e.target.value)}>
+                                  {ENSEMBLES.map(e => <option key={e} value={e}>{e}</option>)}
+                              </Select>
+                          </div>
+                          <Button onClick={handleMassMigrate} className="bg-orange-600 text-white font-bold whitespace-nowrap px-6 border-orange-700">🚚 Migrate All</Button>
                       </div>
                   </Card>
               </div>
