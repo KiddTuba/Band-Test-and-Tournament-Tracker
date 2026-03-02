@@ -247,6 +247,7 @@
           cursor: pointer;
           color: var(--dark-navy);
           outline: none;
+          font-weight: bold;
       }
 
       /* --- Center Championship Area --- */
@@ -318,6 +319,19 @@
           letter-spacing: 1px;
       }
 
+      /* --- Grand Champion Animation --- */
+      @keyframes goldShine {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+      }
+      .champ-banner-mega {
+          background: linear-gradient(90deg, #FFDF00, #FFFFFF, #D4AF37, #FFDF00);
+          background-size: 200% auto;
+          animation: goldShine 3s linear infinite;
+          border: 4px solid #002147;
+          box-shadow: 0 10px 25px rgba(212, 175, 55, 0.6);
+      }
+
       /* Certificate Print Overrides */
       @media print {
           .no-print { display: none !important; }
@@ -336,10 +350,8 @@
           .bracket-headers .h-col { color: var(--dark-navy); background: transparent !important; }
           .region-watermark { opacity: 0.08; }
           
-          /* Force landscape for general printing, certificate handles its own logic if needed */
           @page { size: landscape; margin: 0.5cm; }
           
-          /* Certificate Specific Print Classes */
           .print-cert-only { display: flex !important; }
           .hide-on-cert-print { display: none !important; }
       }
@@ -348,7 +360,6 @@
   <body>
     <div id="root"></div>
 
-    <!-- React 18 UMD + Babel for in‑browser JSX -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -367,6 +378,15 @@
       ];
 
       const TOURNAMENT_SIZES = [8, 16, 32, 64];
+
+      const STORE_ITEMS = [
+        { id: 'pass', name: 'Free pass of a Round', cost: 500, desc: 'Cannot be used to enter Final 4 or beyond.' },
+        { id: 'bump', name: 'Bump score to a 10', cost: 200, desc: 'Auto 10 on chair test.' },
+        { id: 'freeday', name: 'Free Day playing xbox or uno', cost: 400, desc: 'Rest your chops.' },
+        { id: 'swap', name: 'Swap my instrument for the day', cost: 190, desc: 'Try something new.' },
+        { id: 'boost', name: 'Give someone in my section a boost', cost: 300, desc: 'Chair test boost for a friend.' },
+        { id: 'pizza', name: 'Pizza, Chips, and a soda', cost: 1000, desc: 'Not on test days, tell Mr.A in advance.' }
+      ];
 
       const SOUND_FILES = {
         tournamentStart: "the-espn-sound.mp3",
@@ -393,7 +413,7 @@
         return clamp(n, min, max);
       }
 
-      // ------------------------------------ Persistence & Cloud Sync ------------------------------------
+      // ------------------------------------ Persistence & Real-time Sync ------------------------------------
       const LS_KEY = "band_tracker_state_v1";
 
       function defaultState() {
@@ -459,9 +479,20 @@
           }
         });
 
-        // Smart Cloud Sync Engine
+        // Smart Cloud Sync Engine & Same-Browser Real-Time Sync
         useEffect(() => {
-            // Only attempt to fetch if we are hosted (http/https), not local file://
+            // Real-time sync across tabs in the same browser!
+            const handleStorageChange = (e) => {
+                if (e.key === LS_KEY) {
+                    try {
+                        const raw = localStorage.getItem(LS_KEY);
+                        setRawState(hydrateState(raw ? JSON.parse(raw) : defaultState()));
+                    } catch(err) {}
+                }
+            };
+            window.addEventListener('storage', handleStorageChange);
+
+            // Fetch from Cloud (GitHub Pages workflow)
             if (window.location.protocol.startsWith('http')) {
                 fetch('data.json', { cache: 'no-store' })
                     .then(r => {
@@ -472,20 +503,18 @@
                         setRawState(prev => {
                             const localTime = prev._lastModified || 0;
                             const cloudTime = cloudData._lastModified || 0;
-                            
                             if (cloudTime > localTime || !prev.students.length) {
                                 return hydrateState(cloudData);
                             }
                             return prev;
                         });
                     })
-                    .catch(() => {
-                        // Silently fail if data.json doesn't exist yet
-                    });
+                    .catch(() => {});
             }
+
+            return () => window.removeEventListener('storage', handleStorageChange);
         }, []);
 
-        // Custom setState that automatically bumps _lastModified
         const setState = useCallback((updater) => {
             setRawState(prev => {
                 const nextState = typeof updater === 'function' ? updater(prev) : updater;
@@ -638,11 +667,14 @@
         return { play };
       }
 
-      // ------------------------------------ Students ------------------------------------
+      // ------------------------------------ Students & Store ------------------------------------
       function StudentsManager({ state, setState }) {
         const [filterInstrument, setFilterInstrument] = useState("");
         const [q, setQ] = useState("");
         const [newStudent, setNewStudent] = useState({ name: "", instrument: INSTRUMENTS[0] });
+        
+        // Local state for dropdowns in table
+        const [storeSelections, setStoreSelections] = useState({});
 
         const { play: playSound } = useAudioBank(state.settings);
 
@@ -691,6 +723,24 @@
           }));
         }
 
+        function buyStoreItem(studentId) {
+            const itemId = storeSelections[studentId];
+            if (!itemId) return;
+            const item = STORE_ITEMS.find(i => i.id === itemId);
+            const student = state.students.find(s => s.id === studentId);
+            
+            if (!item || !student) return;
+            if ((student.bandBucks || 0) < item.cost) {
+                alert("Not enough Band Bucks!");
+                return;
+            }
+            
+            if (confirm(`Confirm purchase: ${item.name} for ${item.cost} bucks?`)) {
+                setBandBucks(studentId, -item.cost);
+                setStoreSelections(prev => ({ ...prev, [studentId]: "" }));
+            }
+        }
+
         function updateStudentInstrument(id, newInstrument) {
           setState((prev) => {
             const students = (prev.students || []).map((s) =>
@@ -716,7 +766,7 @@
 
         return (
           <Card
-            title="Students"
+            title="Students & Band Store"
             actions={
               <div className="flex gap-2">
                 <Select value={filterInstrument} onChange={(e) => setFilterInstrument(e.target.value)}>
@@ -751,16 +801,18 @@
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="text-left text-gray-600">
+                  <tr className="text-left text-gray-600 border-b">
                     <th className="py-2 pr-4">Name</th>
                     <th className="py-2 pr-4">Instrument</th>
-                    <th className="py-2 pr-4">Band Bucks</th>
-                    <th className="py-2 pr-4">Actions</th>
+                    <th className="py-2 pr-4">Bank</th>
+                    <th className="py-2 pr-4">Manage Bucks</th>
+                    <th className="py-2 pr-4">Band Store Purchases</th>
+                    <th className="py-2 pr-4">Danger</th>
                   </tr>
                 </thead>
                 <tbody>
                   {students.map((s) => (
-                    <tr key={s.id} className="border-t">
+                    <tr key={s.id} className="border-b hover:bg-gray-50">
                       <td className="py-2 pr-4 font-medium">
                         <input
                           className="px-2 py-1 border border-transparent rounded hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 md:w-48 bg-transparent transition-colors"
@@ -784,19 +836,46 @@
                           ))}
                         </Select>
                       </td>
-                      <td className="py-2 pr-4">{s.bandBucks || 0}</td>
+                      <td className="py-2 pr-4 font-bold text-green-700 text-lg">
+                          ${s.bandBucks || 0}
+                      </td>
                       <td className="py-2 pr-4">
-                        <div className="flex gap-2">
-                          <Button onClick={() => setBandBucks(s.id, +1)}>+1 Buck</Button>
-                          <Button onClick={() => setBandBucks(s.id, +5)}>+5</Button>
-                          <Button onClick={() => setBandBucks(s.id, -1)}>-1</Button>
-                          <Button className="border-red-600 text-red-700" onClick={() => removeStudent(s.id)}>Remove</Button>
+                        <div className="flex gap-1">
+                          <Button className="px-2 py-1" onClick={() => setBandBucks(s.id, +1)}>+1</Button>
+                          <Button className="px-2 py-1" onClick={() => setBandBucks(s.id, +10)}>+10</Button>
+                          <Button className="px-2 py-1 text-red-600" onClick={() => setBandBucks(s.id, -1)}>-1</Button>
                         </div>
+                      </td>
+                      <td className="py-2 pr-4">
+                          <div className="flex gap-2 items-center">
+                              <Select 
+                                  className="text-xs py-1" 
+                                  value={storeSelections[s.id] || ""} 
+                                  onChange={e => setStoreSelections(prev => ({...prev, [s.id]: e.target.value}))}
+                              >
+                                  <option value="">-- Shop --</option>
+                                  {STORE_ITEMS.map(item => (
+                                      <option key={item.id} value={item.id} disabled={(s.bandBucks || 0) < item.cost}>
+                                          {item.name} (${item.cost})
+                                      </option>
+                                  ))}
+                              </Select>
+                              <Button 
+                                  className="bg-green-600 text-white border-green-700 px-2 py-1 text-xs font-bold"
+                                  disabled={!storeSelections[s.id]}
+                                  onClick={() => buyStoreItem(s.id)}
+                              >
+                                  Buy
+                              </Button>
+                          </div>
+                      </td>
+                      <td className="py-2 pr-4">
+                        <Button className="border-red-600 text-red-700 px-2 py-1 text-xs" onClick={() => removeStudent(s.id)}>Remove</Button>
                       </td>
                     </tr>
                   ))}
                   {students.length === 0 && (
-                    <tr><td className="py-3 text-gray-500" colSpan={4}>No students yet. Add some above.</td></tr>
+                    <tr><td className="py-3 text-gray-500" colSpan={6}>No students yet. Add some above.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -805,7 +884,7 @@
         );
       }
 
-      // ------------------------------------ Daily Grades (0–200) ------------------------------------
+      // ------------------------------------ Daily Grades ------------------------------------
       function DailyGrades({ state, setState }) {
         const [date, setDate] = useState(todayISO());
         const students = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
@@ -873,7 +952,7 @@
           if (!name.trim()) return;
           setState((prev) => ({
             ...prev,
-            chairTests: [...prev.chairTests, { id: uid(), name: name.trim(), date, scores: {}, isArchived: false }],
+            chairTests: [...prev.chairTests, { id: uid(), name: name.trim(), date, scores: {}, isArchived: false, bucksAwarded: false }],
           }));
           setName("");
           setDate(todayISO());
@@ -902,6 +981,34 @@
           setState((prev) => ({ ...prev, chairTests: prev.chairTests.filter((t) => t.id !== id) }));
         }
 
+        function awardBucksForTest(testId) {
+            const test = state.chairTests.find(t => t.id === testId);
+            if (!test) return;
+            if (test.bucksAwarded) {
+                alert("Bucks already awarded for this test!");
+                return;
+            }
+            
+            let updates = {};
+            Object.entries(test.scores || {}).forEach(([sId, scoreStr]) => {
+                const score = Number(scoreStr);
+                if (score >= 9.4) updates[sId] = 20;
+                else if (score >= 8.5) updates[sId] = 10;
+            });
+
+            setState(prev => {
+                const students = prev.students.map(s => {
+                    if (updates[s.id]) return { ...s, bandBucks: (s.bandBucks || 0) + updates[s.id] };
+                    return s;
+                });
+                const chairTests = prev.chairTests.map(t => 
+                    t.id === testId ? { ...t, bucksAwarded: true } : t
+                );
+                return { ...prev, students, chairTests };
+            });
+            alert("Band Bucks successfully awarded for high scores!");
+        }
+
         return (
           <div className="space-y-4">
             <Card title="Create Chair Test" actions={null}>
@@ -918,6 +1025,13 @@
                 title={`${t.name} — ${t.date}`}
                 actions={
                   <div className="flex gap-2">
+                      <Button 
+                          className={`font-bold ${t.bucksAwarded ? 'bg-gray-100 text-gray-400' : 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'}`}
+                          onClick={() => awardBucksForTest(t.id)}
+                          disabled={t.bucksAwarded}
+                      >
+                          {t.bucksAwarded ? "✓ Bucks Awarded" : "💰 Award Test Bucks"}
+                      </Button>
                       <Button className="border-yellow-600 text-yellow-700" onClick={() => archiveTest(t.id)}>Archive</Button>
                       <Button className="border-red-600 text-red-700" onClick={() => deleteTest(t.id)}>Delete</Button>
                   </div>
@@ -1052,9 +1166,6 @@
                        </div>
                        <Button onClick={handleGenerate} className="bg-[#002147] text-white font-bold whitespace-nowrap px-6">⚡ Auto-Generate</Button>
                    </div>
-                   <p className="text-xs text-gray-500 mt-3">
-                       <strong>Logic:</strong> Tournament participants rank highest (based on furthest round reached). Ties (knocked out in the same round) are decided by a random draw. Non-participants are placed underneath, ordered by their Base Chair Test score.
-                   </p>
                </Card>
 
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
@@ -1236,9 +1347,11 @@
                   </div>
 
                   {currentDefendingChampion && (
-                      <div className="text-center bg-[#002147] text-white p-4 rounded-xl shadow-md border-2 border-yellow-400 max-w-2xl mx-auto">
-                          <p className="text-yellow-400 font-bold uppercase tracking-widest text-xs mb-1">Current Defending Champion</p>
-                          <h2 className="text-3xl font-black italic">{currentDefendingChampion}</h2>
+                      <div className="text-center champ-banner-mega p-8 rounded-2xl mx-auto w-full max-w-4xl transform hover:scale-105 transition-transform duration-300 relative overflow-hidden">
+                          <p className="text-[#002147] font-bold uppercase tracking-widest text-sm mb-2 drop-shadow-sm">Current Defending Champion</p>
+                          <h2 className="text-6xl font-black italic text-[#002147] drop-shadow-lg tracking-tighter">{currentDefendingChampion}</h2>
+                          <div className="absolute top-2 right-4 text-5xl opacity-50">👑</div>
+                          <div className="absolute bottom-2 left-4 text-5xl opacity-50">🌟</div>
                       </div>
                   )}
 
@@ -1285,13 +1398,10 @@
 
       // ------------------------------------ Certificate View ------------------------------------
       function CertificateView({ data, onCancel }) {
-          // data = { champName, date, tournamentName }
-          
           return (
               <div className="fixed inset-0 z-[100000] bg-gray-200 overflow-y-auto print-cert-only flex justify-center p-8 no-print-bg">
                   <div className="relative w-[11in] h-[8.5in] bg-white shadow-2xl flex flex-col items-center justify-center p-16 text-center border-[20px] border-double border-[#002147] mx-auto print:shadow-none print:w-full print:h-full print:border-[16px] print:m-0 print:p-12">
                       
-                      {/* Controls (Hidden when actually printing) */}
                       <div className="absolute top-6 right-6 no-print flex gap-2">
                           <Button onClick={onCancel} className="bg-gray-200 text-gray-800 font-bold border-gray-400">⬅ Back to Hall</Button>
                           <Button onClick={() => window.print()} className="bg-blue-600 text-white font-bold border-blue-700 shadow-lg">🖨️ Print Now</Button>
@@ -1326,7 +1436,6 @@
               </div>
           );
       }
-
 
       // ------------------------------------ Visual ESPN Bracket Component ------------------------------------
 
@@ -1386,38 +1495,44 @@
               const isRound1 = roundIdx === 0;
               const classes = `slot ${isActive ? 'interactable' : ''} ${isWinner ? 'winner' : ''}`;
               
+              // Only admins can swap names, and only in round 1
+              const showAdminDropdown = isRound1 && !readOnly;
+
               return (
                   <div className="slot-wrapper">
-                      <div className={classes} onClick={() => isActive && onSetWinner(match.id, playerId)}>
-                          {playerId ? (
-                              <div className="player group flex justify-between items-center w-full">
+                      <div className={classes} onClick={() => isActive && !showAdminDropdown && onSetWinner(match.id, playerId)}>
+                          {showAdminDropdown ? (
+                              <div className="flex w-full h-full items-center pl-1 bg-yellow-50/30">
+                                  {seed && <span className="text-xs text-gray-500 mr-1 font-normal">#{seed}</span>}
+                                  <select 
+                                      className="w-full h-full text-[0.7rem] bg-transparent outline-none cursor-pointer text-gray-800"
+                                      onChange={(e) => onUpdatePlayer(match.id, slotKey, e.target.value)}
+                                      onClick={(e) => e.stopPropagation()} // Prevent accidental win selection
+                                      value={playerId || ""}
+                                  >
+                                      <option value="">-- Empty Slot --</option>
+                                      {playerId && <option value={playerId} className="font-bold">{nameOf(playerId)}</option>}
+                                      <optgroup label="Available Players">
+                                          {availableStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                      </optgroup>
+                                  </select>
+                                  {isActive && playerId && (
+                                    <button 
+                                        className="bg-green-100 text-green-700 hover:bg-green-200 h-full px-2 border-l border-green-200 flex-shrink-0 font-bold text-xs transition"
+                                        onClick={(e) => { e.stopPropagation(); onSetWinner(match.id, playerId); }}
+                                        title="Declare Winner"
+                                    >✓</button>
+                                  )}
+                              </div>
+                          ) : playerId ? (
+                              <div className="player flex justify-between items-center w-full">
                                   <span className="truncate">
                                       {seed && <span className="text-xs text-gray-500 mr-1 font-normal">#{seed}</span>}
                                       {nameOf(playerId)}
                                   </span>
-                                  {isRound1 && !match.winnerId && !readOnly && (
-                                      <button 
-                                          onClick={(e) => { e.stopPropagation(); onUpdatePlayer(match.id, slotKey, null); }} 
-                                          className="hidden group-hover:block text-red-500 font-bold px-1 hover:text-red-700 bg-white/80 rounded"
-                                          title="Remove Player"
-                                      >×</button>
-                                  )}
                               </div>
                           ) : (
-                              isRound1 && !readOnly ? (
-                                  <select 
-                                      className="w-full h-full text-xs bg-transparent outline-none px-1 cursor-pointer text-gray-600"
-                                      onChange={(e) => onUpdatePlayer(match.id, slotKey, e.target.value)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      value=""
-                                  >
-                                      <option value="" disabled hidden>+ Add Player</option>
-                                      <option value="">-- Leave Empty --</option>
-                                      {availableStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                  </select>
-                              ) : (
-                                  <div className="player text-gray-400 italic">TBD</div>
-                              )
+                              <div className="player text-gray-400 italic">TBD</div>
                           )}
                       </div>
                   </div>
@@ -1590,7 +1705,6 @@
           return { bracket: finalBracket, seedsById };
       }
 
-
       function Tournaments({ state, setState, isAdmin }) {
         const [selectedTestId, setSelectedTestId] = useState("");
         const [selectedInstrument, setSelectedInstrument] = useState("");
@@ -1698,15 +1812,50 @@
                 if (!t) return prev;
                 const b = structuredClone(t.bracket);
                 const match = b.rounds[0].matches.find((m) => m.id === matchId);
+                
                 if (match) {
+                    const oldPlayerId = match[slotKey];
                     match[slotKey] = newPlayerId || null;
-                    if (match.winnerId && match.winnerId !== match.p1Id && match.winnerId !== match.p2Id) {
-                        match.winnerId = null;
-                        match.award = null;
+
+                    // If replacing an existing player, cascade the change to future rounds
+                    if (oldPlayerId && newPlayerId) {
+                        for (let r = 0; r < b.rounds.length; r++) {
+                            b.rounds[r].matches.forEach(m => {
+                                if (m.p1Id === oldPlayerId) m.p1Id = newPlayerId;
+                                if (m.p2Id === oldPlayerId) m.p2Id = newPlayerId;
+                                if (m.winnerId === oldPlayerId) {
+                                    m.winnerId = newPlayerId;
+                                    if (m.award && m.award.winnerId === oldPlayerId) m.award.winnerId = newPlayerId;
+                                }
+                            });
+                        }
+                        // Swap seeds
+                        t.seedsById[newPlayerId] = t.seedsById[oldPlayerId];
+                        delete t.seedsById[oldPlayerId];
+                    } 
+                    // Handle complete removal of player
+                    else if (oldPlayerId && !newPlayerId) {
+                         for (let r = 0; r < b.rounds.length; r++) {
+                            b.rounds[r].matches.forEach(m => {
+                                if (m.p1Id === oldPlayerId) m.p1Id = null;
+                                if (m.p2Id === oldPlayerId) m.p2Id = null;
+                                if (m.winnerId === oldPlayerId) m.winnerId = null;
+                            });
+                        }
                     }
                 }
+                
                 const newB = propagateWinners(b);
-                const updatedTournament = { ...t, bracket: newB, goldStands: extractGoldStands(newB) };
+                
+                // Also update Champion if it was the old player
+                let newChampId = t.championId;
+                const finalMatch = newB.rounds[newB.rounds.length - 1].matches[0];
+                if (finalMatch.winnerId) newChampId = finalMatch.winnerId;
+                else newChampId = null;
+
+                const newChampName = newChampId ? prev.students.find(s => s.id === newChampId)?.name : null;
+
+                const updatedTournament = { ...t, bracket: newB, goldStands: extractGoldStands(newB), championId: newChampId, championName: newChampName };
                 return {
                     ...prev,
                     tournaments: prev.tournaments.map((x) => x.id === tournamentId ? updatedTournament : x)
@@ -1714,16 +1863,34 @@
             });
         }
 
-        function awardForMatch({ tournament, roundIndex, winnerId, loserId }) {
-          const base = Number(state.settings?.bucksPerRound ?? 10) * (roundIndex + 1);
-          const bonusPerSeed = Number(state.settings?.underdogBonusPerSeed ?? 0);
-          let bonus = 0;
-          const wSeed = tournament.seedsById?.[winnerId] ?? null;
-          const lSeed = tournament.seedsById?.[loserId] ?? null;
-          if (bonusPerSeed > 0 && wSeed && lSeed && wSeed > lSeed) {
-            bonus = (wSeed - lSeed) * bonusPerSeed;
-          }
-          return Math.max(0, Math.round((base + bonus) * 10) / 10);
+        function awardForMatch(tournament, bracket, roundIndex, winnerId, loserId) {
+            let bonus = 0;
+
+            // Upset bonus
+            const wSeed = tournament.seedsById?.[winnerId] ?? null;
+            const lSeed = tournament.seedsById?.[loserId] ?? null;
+            if (wSeed && lSeed && wSeed > lSeed) {
+               bonus += (wSeed - lSeed) * 2; // Default underdog logic
+            }
+
+            // Progression logic
+            const numRounds = bracket.rounds.length;
+            const isFinalRound = roundIndex === numRounds - 1;
+            const nextRound = bracket.rounds[roundIndex + 1];
+
+            // Base for ANY win is 10
+            let base = 10;
+
+            if (isFinalRound) {
+                // Champion! (+100)
+                base += 100;
+            } else if (nextRound) {
+                if (nextRound.name === "Elite Eight") base += 8;
+                if (nextRound.name === "The Final Four") base += 40;
+                if (nextRound.name === "Championship Round") base += 50;
+            }
+
+            return base + bonus;
         }
 
         function roundIsComplete(bracket, roundIndex) {
@@ -1765,339 +1932,4 @@
 
             let students = prev.students || [];
             if (oldWinner && oldAward > 0) {
-              students = students.map((s) => (s.id === oldWinner ? { ...s, bandBucks: Math.max(0, (s.bandBucks || 0) - oldAward) } : s));
-            }
-
-            match.winnerId = winnerId;
-            const p1 = match.p1Id;
-            const p2 = match.p2Id;
-            const loserId = (winnerId === p1) ? p2 : (winnerId === p2 ? p1 : null);
-
-            const isBye = (!!winnerId && (!p1 || !p2));
-            const canAward = !isBye || !!(prev.settings?.awardOnBye);
-            const awardAmt = (canAward && loserId) ? awardForMatch({ tournament: t, roundIndex, winnerId, loserId }) : 0;
-            match.award = awardAmt > 0 ? { winnerId, amount: awardAmt } : null;
-
-            if (winnerId && awardAmt > 0) {
-              students = students.map((s) => (s.id === winnerId ? { ...s, bandBucks: (s.bandBucks || 0) + awardAmt } : s));
-            }
-
-            const wasComplete = roundIsComplete(before, roundIndex);
-            const newB = propagateWinners(b);
-            const nowComplete = roundIsComplete(newB, roundIndex);
-            const isFinalRound = roundIndex === newB.rounds.length - 1;
-
-            const finalMatch = newB.rounds[newB.rounds.length - 1].matches[0];
-            const newChamp = finalMatch?.winnerId || null;
-            const becameChampion = !!newChamp && !t.championId;
-
-            const newChampName = newChamp ? (students.find(s => s.id === newChamp)?.name || "Unknown") : null;
-
-            const winnerSeed = t.seedsById?.[winnerId] ?? null;
-            const underdog = winnerSeed && winnerSeed > (t.size / 2);
-            const lateRound = newB.rounds[roundIndex]?.name === "Elite Eight" || newB.rounds[roundIndex]?.name === "The Final Four";
-
-            const updatedTournament = {
-              ...t,
-              bracket: newB,
-              goldStands: extractGoldStands(newB),
-              championId: newChamp,
-              championName: newChampName
-            };
-
-            const next = {
-              ...prev,
-              students,
-              tournaments: (prev.tournaments || []).map((x) => (x.id === tournamentId ? updatedTournament : x)),
-            };
-
-            const settingsSnap = prev.settings || {};
-            setTimeout(() => {
-              if (underdog && lateRound) playSound("deepRun");
-              if (nowComplete && !wasComplete && !isFinalRound) {
-                const key = settingsSnap.betweenRoundsTheme || "betweenRoundsA";
-                playSound(key);
-              }
-              if (becameChampion) playSound("victory");
-            }, 0);
-
-            return next;
-          });
-        }
-
-        const activeTournaments = state.tournaments.filter(t => !t.isArchived);
-
-        return (
-          <div className="space-y-4">
-            {isAdmin && (
-                <Card title="Start New Band Madness" actions={null}>
-                  <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
-                    <Select value={selectedTestId} onChange={(e) => setSelectedTestId(e.target.value)}>
-                      <option value="">Seed from Chair Test…</option>
-                      {tests.map((t) => (
-                        <option key={t.id} value={t.id}>{t.date} — {t.name}</option>
-                      ))}
-                    </Select>
-                    <Select value={selectedInstrument} onChange={(e) => setSelectedInstrument(e.target.value)}>
-                      <option value="">All Instruments</option>
-                      {INSTRUMENTS.map((i) => (
-                        <option key={i} value={i}>{i}</option>
-                      ))}
-                    </Select>
-                    <Select value={String(size)} onChange={(e) => setSize(Number(e.target.value))}>
-                      {TOURNAMENT_SIZES.map((n) => (
-                        <option key={n} value={String(n)}>{n}-Seed</option>
-                      ))}
-                    </Select>
-                    <Input placeholder="Tournament name" value={name} onChange={(e) => setName(e.target.value)} />
-                    <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                    <div className="flex items-center gap-2">
-                      <Button onClick={createTournament} className="bg-blue-600 text-white border-blue-600 w-full font-bold">Auto Seed & Create</Button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    * Note: Auto-Seed automatically pulls students who scored <strong>8.5 or higher</strong>, groups them by section, and evenly distributes them across the 4 Regions (No Cap, Aura, Vibe Check, Goated) to prevent early matchups between the same instruments. You can manually fill empty slots later if you desire.
-                  </p>
-                </Card>
-            )}
-
-            {activeTournaments.map((t) => {
-              const isFullscreen = fullscreenTournamentId === t.id;
-
-              return (
-                <div key={t.id} className={isFullscreen ? "fullscreen-overlay" : "relative mt-8 bg-white border shadow-sm rounded-2xl overflow-hidden"}>
-                  <div className="w-full bg-gradient-to-br from-[#002147] to-[#001530] text-white p-4 flex items-center justify-center gap-4 border-b-4 border-blue-400">
-                      <LogoSVG />
-                      <div className="text-center">
-                          <h1 className="text-3xl italic font-black uppercase tracking-wider text-shadow-md">{t.name}</h1>
-                          <p className="text-blue-300 font-bold tracking-wide uppercase">{t.instrument === "All" ? "Whippet Barking Battalion" : `${t.instrument} Battalion`}</p>
-                      </div>
-                  </div>
-
-                  <div className="bg-white p-4 border-b flex flex-wrap gap-2 items-center justify-between no-print">
-                     <div className="text-sm font-semibold">
-                         {t.date} • {t.size}-Seed Bracket
-                     </div>
-                     <div className="flex gap-2">
-                         {isAdmin && <Button onClick={() => archiveTournament(t.id)} className="font-bold border-yellow-600 text-yellow-700 bg-yellow-50">📁 Archive</Button>}
-                         {isAdmin && <Button onClick={() => deleteTournament(t.id)} className="font-bold border-red-600 text-red-700 bg-red-50">🗑️ Delete</Button>}
-                         {isAdmin && <Button onClick={() => reseedTournament(t.id)} className="font-bold border-orange-600 text-orange-700 bg-orange-50">🔄 Reseed Tournament</Button>}
-                         <Button 
-                             onClick={() => setFullscreenTournamentId(isFullscreen ? null : t.id)} 
-                             className="font-bold border-purple-600 text-purple-700 bg-purple-50"
-                         >
-                             {isFullscreen ? "↙️ Exit Full Screen" : "📺 Full Screen"}
-                         </Button>
-                         <Button onClick={() => window.print()} className="font-bold border-blue-600 text-blue-700 bg-blue-50">🖨️ Print Full Bracket</Button>
-                     </div>
-                  </div>
-
-                  <div className="bracket-scroll-container">
-                      <BracketView
-                        tournament={t}
-                        students={state.students}
-                        readOnly={!isAdmin}
-                        onSetWinner={(matchId, winnerId) => setWinner(t.id, matchId, winnerId)}
-                        onUpdatePlayer={(matchId, slotKey, newPlayerId) => updateMatchPlayer(t.id, matchId, slotKey, newPlayerId)}
-                      />
-                  </div>
-
-                  {isAdmin && (
-                      <div className="flex flex-wrap justify-center items-center gap-3 p-4 bg-gray-50 border-t border-gray-200 no-print">
-                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mr-2">Soundboard</span>
-                          <Button onClick={() => playSound("tournamentStart")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 SportsCenter Start</Button>
-                          <Button onClick={() => playSound("betweenRoundsA")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 NBA on ESPN</Button>
-                          <Button onClick={() => playSound("betweenRoundsB")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 ESPN Theme</Button>
-                          <Button onClick={() => playSound("deepRun")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 Deep Run</Button>
-                          <Button onClick={() => playSound("victory")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 Victory Chime</Button>
-                      </div>
-                  )}
-                </div>
-              );
-            })}
-            
-            {activeTournaments.length === 0 && !isAdmin && (
-                <p className="text-gray-500 text-center py-10 italic">No active tournaments currently live. Await the next battle!</p>
-            )}
-          </div>
-        );
-      }
-
-      // ------------------------------------ Section Points ------------------------------------
-      function SectionPoints({ state, setState }) {
-        function add(section, delta) {
-          setState((prev) => ({
-            ...prev,
-            sectionPoints: { ...prev.sectionPoints, [section]: Math.max(0, (prev.sectionPoints[section] || 0) + delta) },
-          }));
-        }
-
-        function resetAll() {
-          if (!confirm("Reset all section points to zero?")) return;
-          const cleared = {};
-          INSTRUMENTS.forEach((i) => (cleared[i] = 0));
-          setState((prev) => ({ ...prev, sectionPoints: cleared }));
-        }
-
-        return (
-          <Card
-            title="Section Points"
-            actions={<Button className="border-red-600 text-red-700" onClick={resetAll}>Reset</Button>}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              {INSTRUMENTS.map((i) => (
-                <div key={i} className="border rounded-xl p-3">
-                  <div className="font-semibold mb-1">{i}</div>
-                  <div className="text-2xl mb-2">{state.sectionPoints[i] || 0}</div>
-                  <div className="flex gap-2">
-                    <Button onClick={() => add(i, +1)}>+1</Button>
-                    <Button onClick={() => add(i, +5)}>+5</Button>
-                    <Button onClick={() => add(i, -1)}>-1</Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        );
-      }
-
-      function BackupRestore({ state, setState }) {
-        function downloadJSON() {
-          const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          // IMPORTANT: Recommending data.json naming for easy cloud uploading
-          a.download = `data.json`;
-          a.click();
-          URL.revokeObjectURL(url);
-        }
-
-        function onUpload(e) {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            try {
-              const text = String(reader.result || "{}");
-              const data = JSON.parse(text);
-              if (!data || typeof data !== "object") throw new Error("Invalid JSON");
-              setState(hydrateState(data));
-            } catch (err) {
-              alert("Failed to load backup: " + (err?.message || err));
-            }
-          };
-          reader.readAsText(file);
-        }
-
-        function clearAll() {
-          if (!confirm("Wipe all data? This cannot be undone.")) return;
-          setState(defaultState());
-        }
-
-        return (
-          <Card title="Backup / Restore / Cloud Sync" actions={null}>
-            <p className="text-sm text-gray-600 mb-4">
-                <strong>How to update the Public View on GitHub:</strong> Click "Export Cloud File" to download your data. Then, upload that exactly named <code>data.json</code> file to your GitHub repository. The public site will automatically fetch and display your newest changes!
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={downloadJSON} className="bg-green-600 text-white border-green-700 font-bold shadow-md">
-                  ☁️ Export Cloud File (data.json)
-              </Button>
-              <label className="px-3 py-2 rounded-2xl shadow-sm border bg-white hover:bg-gray-50 cursor-pointer">
-                Restore from JSON
-                <input type="file" accept="application/json" className="hidden" onChange={onUpload} />
-              </label>
-              <Button className="border-red-600 text-red-700" onClick={clearAll}>Wipe All Local Data</Button>
-            </div>
-          </Card>
-        );
-      }
-
-      // ------------------------------------ App ------------------------------------
-      function App() {
-        const [state, setState] = usePersistentState();
-        
-        // --- The Divine Barrier (Admin vs Public) ---
-        const [isAdmin, setIsAdmin] = useState(false);
-        const [tab, setTab] = useState("Live Brackets");
-        
-        // --- Certificate Print Mode ---
-        const [printCertFor, setPrintCertFor] = useState(null);
-
-        useEffect(() => {
-            if (isAdmin && (tab === "Live Brackets" || tab === "Hall of Champions" || tab === "Public Chairs")) setTab("Tournaments");
-            if (!isAdmin && !["Live Brackets", "Hall of Champions", "Public Chairs"].includes(tab)) setTab("Live Brackets");
-        }, [isAdmin]);
-
-        const adminTabs = ["Students", "Daily Grades", "Chair Tests", "Chairs", "Tournaments", "Archives", "Section Points", "Backup"];
-        const publicTabs = ["Live Brackets", "Public Chairs", "Hall of Champions"];
-        const tabs = isAdmin ? adminTabs : publicTabs;
-
-        function toggleAdmin() {
-            if (isAdmin) {
-                setIsAdmin(false);
-            } else {
-                const code = prompt("Enter Admin Passcode:");
-                if (code === "admin") {
-                    setIsAdmin(true);
-                } else if (code !== null) {
-                    alert("Incorrect passcode. Begone, mortal.");
-                }
-            }
-        }
-
-        // If rendering certificate, hijack entire view
-        if (printCertFor) {
-            return <CertificateView data={printCertFor} onCancel={() => setPrintCertFor(null)} />;
-        }
-
-        return (
-          <div className="min-h-screen text-gray-900 hide-on-cert-print">
-            <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
-              
-              <div className="flex items-center justify-between no-print mb-4 border-b border-gray-200 pb-4">
-                <div>
-                  <h1 className="text-3xl font-black text-[#002147] tracking-tight">
-                      Barking Battalion <span className="text-blue-500 font-light">| Tracker</span>
-                  </h1>
-                  <div className="text-sm font-semibold text-gray-500 flex items-center gap-2 mt-1">
-                      {isAdmin ? "🛠️ Teacher Admin Mode" : "👀 Public Spectator Mode"}
-                  </div>
-                </div>
-                <div>
-                    <Button 
-                        onClick={toggleAdmin} 
-                        className={isAdmin ? "bg-red-50 text-red-600 border-red-200" : "bg-blue-50 text-blue-600 border-blue-200"}
-                    >
-                        {isAdmin ? "Logout Admin" : "Admin Login"}
-                    </Button>
-                </div>
-              </div>
-
-              <Tabs tabs={tabs} current={tab} onChange={setTab} />
-
-              {/* Admin Views */}
-              {isAdmin && tab === "Students" && <StudentsManager state={state} setState={setState} />}
-              {isAdmin && tab === "Daily Grades" && <DailyGrades state={state} setState={setState} />}
-              {isAdmin && tab === "Chair Tests" && <ChairTests state={state} setState={setState} />}
-              {isAdmin && tab === "Chairs" && <ChairsManager state={state} setState={setState} />}
-              {isAdmin && tab === "Archives" && <Archives state={state} setState={setState} />}
-              {isAdmin && tab === "Section Points" && <SectionPoints state={state} setState={setState} />}
-              {isAdmin && tab === "Backup" && <BackupRestore state={state} setState={setState} />}
-              
-              {/* Shared/Public Views */}
-              {(tab === "Tournaments" || tab === "Live Brackets") && <Tournaments state={state} setState={setState} isAdmin={isAdmin} />}
-              {tab === "Public Chairs" && <PublicChairs state={state} />}
-              {tab === "Hall of Champions" && <HallOfChampions state={state} onPrintCert={setPrintCertFor} />}
-
-            </div>
-          </div>
-        );
-      }
-
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(<App />);
-    </script>
-  </body>
-</html>
+              students = students.map((s) => (s.id === old
