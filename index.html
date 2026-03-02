@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Band Tournament & Class Tracker</title>
+    <title>Band Battalion Tracker Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root {
@@ -24,334 +24,113 @@
 
       body { background:#f8fafc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 
+      /* --- Animations --- */
+      @keyframes shine {
+        0% { background-position: -100% 0; }
+        100% { background-position: 200% 0; }
+      }
+      
+      .champ-glow {
+        background: linear-gradient(to right, #FFD700 20%, #FFF8DC 40%, #FFD700 60%, #B8860B 80%);
+        background-size: 200% auto;
+        animation: shine 3s linear infinite;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
       /* --- Fullscreen Mode --- */
       .fullscreen-overlay {
           position: fixed !important;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          width: 100vw;
-          height: 100vh;
+          top: 0; left: 0; right: 0; bottom: 0;
+          width: 100vw; height: 100vh;
           z-index: 99999;
           background-color: #f8fafc;
           overflow-y: auto;
-          margin: 0 !important;
-          padding: 0;
+          margin: 0 !important; padding: 0;
           border-radius: 0 !important;
-          display: flex;
-          flex-direction: column;
+          display: flex; flex-direction: column;
       }
 
-      /* --- Bracket Container & Layout --- */
+      /* --- Bracket Layout --- */
       .bracket-scroll-container {
-          width: 100%;
-          overflow-x: auto;
-          text-align: center;
-          background-color: #f4f7f6;
-          flex-grow: 1; 
+          width: 100%; overflow-x: auto; text-align: center;
+          background-color: #f4f7f6; flex-grow: 1; 
       }
-
       .bracket-wrapper {
-          position: relative;
-          padding: 40px 60px; 
-          display: inline-flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: left; 
+          position: relative; padding: 40px 60px; 
+          display: inline-flex; flex-direction: column;
+          align-items: center; text-align: left; 
       }
-
       .bracket-headers {
-          display: flex;
-          justify-content: space-between;
-          width: 100%;
-          margin-bottom: 20px;
-          padding: 0 15px;
-          background-color: var(--dark-navy);
-          border-radius: 5px;
-          overflow: hidden;
-          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          display: flex; justify-content: space-between; width: 100%;
+          margin-bottom: 20px; padding: 0 15px;
+          background-color: var(--dark-navy); border-radius: 5px;
+          overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
       }
-
       .bracket-headers .h-col {
-          width: var(--slot-width);
-          text-align: center;
-          font-weight: 800;
-          font-size: 0.85rem;
-          text-transform: uppercase;
-          color: var(--white);
-          padding: 10px 0;
-          background-color: var(--dark-navy);
-          margin: 0 15px;
+          width: var(--slot-width); text-align: center; font-weight: 800;
+          font-size: 0.85rem; text-transform: uppercase; color: var(--white);
+          padding: 10px 0; background-color: var(--dark-navy); margin: 0 15px;
       }
-      
-      .bracket-headers .h-col:nth-child(even) {
-          background-color: #001A38;
-      }
-
-      .bracket-headers .h-col.center {
-          width: calc(var(--slot-width) * 1.5);
-          color: var(--columbia-blue);
-      }
-
-      .bracket-body {
-          display: flex;
-          justify-content: center;
-          align-items: stretch;
-          position: relative;
-          min-height: 600px;
-      }
+      .bracket-headers .h-col.center { width: calc(var(--slot-width) * 1.5); color: var(--columbia-blue); }
+      .bracket-body { display: flex; justify-content: center; align-items: stretch; position: relative; min-height: 600px; }
 
       /* Watermarks */
       .region-watermark {
-          position: absolute;
-          font-size: 5rem;
-          color: rgba(123, 175, 212, 0.15);
-          font-weight: 900;
-          text-transform: uppercase;
-          z-index: 0;
-          transform: rotate(-45deg);
-          pointer-events: none;
-          user-select: none;
+          position: absolute; font-size: 5rem; color: rgba(123, 175, 212, 0.15);
+          font-weight: 900; text-transform: uppercase; z-index: 0;
+          transform: rotate(-45deg); pointer-events: none; user-select: none;
       }
       .wm-nocap { top: 20%; left: 10%; }
       .wm-aura { top: 70%; left: 10%; }
       .wm-vibe { top: 20%; right: 10%; }
       .wm-goated { top: 70%; right: 10%; }
 
-      /* --- Columns & Connectors --- */
-      .column {
-          display: flex;
-          flex-direction: column;
-          width: var(--slot-width);
-          margin: 0 calc(var(--col-gap) / 2);
-          z-index: 1;
-      }
-
-      .center-col {
-          width: calc(var(--slot-width) * 1.5);
-          justify-content: center;
-          align-items: center;
-          margin: 0 calc(var(--col-gap) / 2);
-      }
-
-      .matchup {
-          display: flex;
-          flex-direction: column;
-          justify-content: space-around;
-          position: relative;
-          flex: 1; 
-          margin: 5px 0;
-      }
-
-      .left-side .matchup::before {
-          content: "";
-          position: absolute;
-          right: -15px;
-          top: 25%;
-          bottom: 25%;
-          width: 15px;
-          border: var(--line-width) solid var(--line-color);
-          border-left: none;
-          z-index: -1;
-      }
-      .left-side .matchup::after {
-          content: "";
-          position: absolute;
-          right: -30px;
-          top: 50%;
-          width: 15px;
-          border-top: var(--line-width) solid var(--line-color);
-          z-index: -1;
-      }
-
-      .right-side .matchup::before {
-          content: "";
-          position: absolute;
-          left: -15px;
-          top: 25%;
-          bottom: 25%;
-          width: 15px;
-          border: var(--line-width) solid var(--line-color);
-          border-right: none;
-          z-index: -1;
-      }
-      .right-side .matchup::after {
-          content: "";
-          position: absolute;
-          left: -30px;
-          top: 50%;
-          width: 15px;
-          border-top: var(--line-width) solid var(--line-color);
-          z-index: -1;
-      }
-
-      .no-lines .matchup::before, .no-lines .matchup::after {
-          display: none;
-      }
-
-      /* --- Slots & Players --- */
-      .slot-wrapper {
-          position: relative;
-          width: 100%;
-          z-index: 2;
-      }
-
-      .slot {
-          height: var(--slot-height);
-          width: 100%;
-          background-color: var(--white);
-          border: 1px solid var(--columbia-blue);
-          border-radius: 4px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-          display: flex;
-          align-items: center;
-          font-size: 0.8rem;
-          color: var(--text-dark);
-          transition: all 0.2s ease;
-          position: relative;
-          overflow: hidden;
-      }
-
-      .slot.interactable:hover {
-          background-color: var(--columbia-light);
-          border-color: var(--dark-navy);
-          transform: scale(1.02);
-          cursor: pointer;
-      }
-
-      .slot.winner {
-          background-color: #E8F5E9;
-          border: 2px solid #4CAF50;
-          font-weight: bold;
-      }
-
-      .player {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          padding: 0 8px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-      }
-
-      .slot select {
-          width: 100%;
-          height: 100%;
-          border: none;
-          background: transparent;
-          font-size: 0.75rem;
-          padding: 0 4px;
-          cursor: pointer;
-          color: var(--dark-navy);
-          outline: none;
-          font-weight: bold;
-      }
-
-      /* --- Center Championship Area --- */
-      .center-area {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          width: 100%;
-      }
-
-      .championship-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          width: 100%;
-          position: relative;
-          margin-bottom: 10px;
-      }
-
-      .championship-row .slot-wrapper {
-          width: 45%;
-      }
-
-      .vs-text {
-          font-weight: 900;
-          color: var(--dark-navy);
-          font-size: 0.9rem;
-          font-style: italic;
-      }
-
-      .champion-connector-horizontal {
-          width: 55%;
-          height: 15px;
-          border: var(--line-width) solid var(--line-color);
-          border-bottom: none;
-          border-radius: 4px 4px 0 0;
-          margin: 0 auto;
-      }
+      /* Connectors */
+      .column { display: flex; flex-direction: column; width: var(--slot-width); margin: 0 calc(var(--col-gap) / 2); z-index: 1; }
+      .center-col { width: calc(var(--slot-width) * 1.5); justify-content: center; align-items: center; margin: 0 calc(var(--col-gap) / 2); }
+      .matchup { display: flex; flex-direction: column; justify-content: space-around; position: relative; flex: 1; margin: 5px 0; }
       
-      .champion-connector-vertical {
-          width: var(--line-width);
-          height: 15px;
-          background-color: var(--line-color);
-          margin: 0 auto;
-      }
+      .left-side .matchup::before { content: ""; position: absolute; right: -15px; top: 25%; bottom: 25%; width: 15px; border: var(--line-width) solid var(--line-color); border-left: none; z-index: -1; }
+      .left-side .matchup::after { content: ""; position: absolute; right: -30px; top: 50%; width: 15px; border-top: var(--line-width) solid var(--line-color); z-index: -1; }
+      .right-side .matchup::before { content: ""; position: absolute; left: -15px; top: 25%; bottom: 25%; width: 15px; border: var(--line-width) solid var(--line-color); border-right: none; z-index: -1; }
+      .right-side .matchup::after { content: ""; position: absolute; left: -30px; top: 50%; width: 15px; border-top: var(--line-width) solid var(--line-color); z-index: -1; }
+      .no-lines .matchup::before, .no-lines .matchup::after { display: none; }
 
-      .champion-slot-wrapper {
-          width: 80%;
-          margin-top: 5px;
-          text-align: center;
+      /* Slots */
+      .slot-wrapper { position: relative; width: 100%; z-index: 2; }
+      .slot {
+          height: var(--slot-height); width: 100%;
+          background-color: var(--white); border: 1px solid var(--columbia-blue);
+          border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+          display: flex; align-items: center; font-size: 0.8rem;
+          color: var(--text-dark); transition: all 0.2s ease;
+          position: relative; overflow: hidden;
       }
+      .slot.interactable:hover { background-color: var(--columbia-light); border-color: var(--dark-navy); transform: scale(1.02); cursor: pointer; }
+      .slot.winner { background-color: #E8F5E9; border: 2px solid #4CAF50; font-weight: bold; }
+      .player { width: 100%; height: 100%; display: flex; align-items: center; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .slot select { width: 100%; height: 100%; border: none; background: transparent; font-size: 0.75rem; padding: 0 4px; cursor: pointer; color: var(--dark-navy); outline: none; }
 
-      .champion-slot-wrapper .slot {
-          height: calc(var(--slot-height) * 1.5);
-          font-size: 1rem;
-          font-weight: bold;
-          border: 2px solid #FFD700;
-          background-color: #FFFDF0;
-          box-shadow: 0 4px 10px rgba(255, 215, 0, 0.3);
-          justify-content: center;
-      }
+      /* Championship Center */
+      .center-area { display: flex; flex-direction: column; align-items: center; width: 100%; }
+      .championship-row { display: flex; justify-content: space-between; align-items: center; width: 100%; position: relative; margin-bottom: 10px; }
+      .championship-row .slot-wrapper { width: 45%; }
+      .vs-text { font-weight: 900; color: var(--dark-navy); font-size: 0.9rem; font-style: italic; }
+      .champion-connector-horizontal { width: 55%; height: 15px; border: var(--line-width) solid var(--line-color); border-bottom: none; border-radius: 4px 4px 0 0; margin: 0 auto; }
+      .champion-connector-vertical { width: var(--line-width); height: 15px; background-color: var(--line-color); margin: 0 auto; }
+      .champion-slot-wrapper { width: 80%; margin-top: 5px; text-align: center; }
+      .champion-slot-wrapper .slot { height: calc(var(--slot-height) * 1.5); font-size: 1rem; font-weight: bold; border: 2px solid #FFD700; background-color: #FFFDF0; box-shadow: 0 4px 10px rgba(255, 215, 0, 0.3); justify-content: center; }
+      .champ-label { margin-top: 8px; font-weight: 800; font-size: 0.8rem; text-transform: uppercase; color: var(--dark-navy); letter-spacing: 1px; }
 
-      .champ-label {
-          margin-top: 8px;
-          font-weight: 800;
-          font-size: 0.8rem;
-          text-transform: uppercase;
-          color: var(--dark-navy);
-          letter-spacing: 1px;
-      }
-
-      /* --- Grand Champion Animation --- */
-      @keyframes goldShine {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
-      }
-      .champ-banner-mega {
-          background: linear-gradient(90deg, #FFDF00, #FFFFFF, #D4AF37, #FFDF00);
-          background-size: 200% auto;
-          animation: goldShine 3s linear infinite;
-          border: 4px solid #002147;
-          box-shadow: 0 10px 25px rgba(212, 175, 55, 0.6);
-      }
-
-      /* Certificate Print Overrides */
+      /* Print */
       @media print {
           .no-print { display: none !important; }
           body { background: white; margin: 0; padding: 0; }
-          .bracket-wrapper {
-              transform: scale(0.65);
-              transform-origin: top center;
-              padding: 0;
-              margin-top: -20px;
-          }
-          .bracket-headers {
-              background-color: var(--white);
-              border-bottom: 2px solid var(--dark-navy);
-              box-shadow: none;
-          }
+          .bracket-wrapper { transform: scale(0.65); transform-origin: top center; padding: 0; margin-top: -20px; }
+          .bracket-headers { background-color: var(--white); border-bottom: 2px solid var(--dark-navy); box-shadow: none; }
           .bracket-headers .h-col { color: var(--dark-navy); background: transparent !important; }
-          .region-watermark { opacity: 0.08; }
-          
           @page { size: landscape; margin: 0.5cm; }
-          
           .print-cert-only { display: flex !important; }
           .hide-on-cert-print { display: none !important; }
       }
@@ -367,27 +146,18 @@
     <script type="text/babel">
       const { useEffect, useMemo, useRef, useState, useCallback } = React;
 
-      // ------------------------------------ Constants & Utilities ------------------------------------
-      const INSTRUMENTS = [
-        "Flute",
-        "Clarinet",
-        "Saxophone",
-        "Trumpet",
-        "Low Brass",
-        "Percussion",
-      ];
-
+      // --- Constants ---
+      const INSTRUMENTS = ["Flute", "Clarinet", "Saxophone", "Trumpet", "Low Brass", "Percussion"];
       const TOURNAMENT_SIZES = [8, 16, 32, 64];
-
       const STORE_ITEMS = [
-        { id: 'pass', name: 'Free pass of a Round', cost: 500, desc: 'Cannot be used to enter Final 4 or beyond.' },
-        { id: 'bump', name: 'Bump score to a 10', cost: 200, desc: 'Auto 10 on chair test.' },
-        { id: 'freeday', name: 'Free Day playing xbox or uno', cost: 400, desc: 'Rest your chops.' },
-        { id: 'swap', name: 'Swap my instrument for the day', cost: 190, desc: 'Try something new.' },
-        { id: 'boost', name: 'Give someone in my section a boost', cost: 300, desc: 'Chair test boost for a friend.' },
-        { id: 'pizza', name: 'Pizza, Chips, and a soda', cost: 1000, desc: 'Not on test days, tell Mr.A in advance.' }
+          { name: "Swap my instrument for the day", cost: 190 },
+          { name: "Bump score to a 10", cost: 200 },
+          { name: "Give someone in my section a boost", cost: 300 },
+          { name: "Free Day (Xbox/Uno)", cost: 400 },
+          { name: "Free Pass of a Round (Not Final 4+)", cost: 500 },
+          { name: "Pizza, Chips, & Soda (Non-test days)", cost: 1000 },
       ];
-
+      
       const SOUND_FILES = {
         tournamentStart: "the-espn-sound.mp3",
         betweenRoundsA: "nba_on_espn.mp3",
@@ -398,1538 +168,571 @@
 
       const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
       const todayISO = () => new Date().toISOString().slice(0, 10);
+      function clamp(n, min, max) { return Math.min(Math.max(n, min), max); }
 
-      function clamp(n, min, max) {
-        if (Number.isNaN(n)) return min;
-        if (n < min) return min;
-        if (n > max) return max;
-        return n;
-      }
-
-      function parseScore(val, min = 0, max = 10) {
-        if (val === "" || val === null || val === undefined) return "";
-        const n = Number(val);
-        if (Number.isNaN(n)) return "";
-        return clamp(n, min, max);
-      }
-
-      // ------------------------------------ Persistence & Real-time Sync ------------------------------------
-      const LS_KEY = "band_tracker_state_v1";
-
+      // --- State Management ---
+      const LS_KEY = "band_tracker_v2";
       function defaultState() {
-        const sections = {};
-        INSTRUMENTS.forEach((s) => (sections[s] = 0));
-
-        const chairOrders = {};
-        INSTRUMENTS.forEach((i) => (chairOrders[i] = []));
-
+        const sections = {}; INSTRUMENTS.forEach(s => sections[s] = 0);
+        const orders = {}; INSTRUMENTS.forEach(i => orders[i] = []);
         return {
           _lastModified: Date.now(),
           students: [],
           chairTests: [],
           tournaments: [],
           sectionPoints: sections,
-          chairOrders,
-          settings: {
-            soundEnabled: true,
-            volume: 0.7,
-            betweenRoundsTheme: "betweenRoundsA",
-            clickSongKey: "betweenRoundsA",
-            bucksPerRound: 10,
-            underdogBonusPerSeed: 2,
-            awardOnBye: false,
-            autoApplyChairsOnChampion: false,
-          },
+          chairOrders: orders,
+          settings: { soundEnabled: true, volume: 0.7, bucksPerRound: 10, underdogBonusPerSeed: 2, awardOnBye: false },
         };
       }
 
       function hydrateState(raw) {
-        const d = defaultState();
-        const s = (raw && typeof raw === "object") ? raw : {};
-
-        const merged = {
-          ...d,
-          ...s,
-          sectionPoints: { ...d.sectionPoints, ...(s.sectionPoints || {}) },
-          chairOrders: { ...d.chairOrders, ...(s.chairOrders || {}) },
-          settings: { ...d.settings, ...(s.settings || {}) },
-          _lastModified: s._lastModified || Date.now()
-        };
-
-        merged.students = (merged.students || []).map((st) => ({
-          bandBucks: 0,
-          dailyGrades: {},
-          notes: "",
-          ...st,
-        }));
-
-        merged.chairTests = merged.chairTests || [];
-        merged.tournaments = merged.tournaments || [];
-
-        return merged;
+          const d = defaultState();
+          const s = (raw && typeof raw === "object") ? raw : {};
+          return {
+              ...d,
+              ...s,
+              students: (s.students || []).map(st => ({
+                  bandBucks: 0, dailyGrades: {}, notes: "", purchaseHistory: [], ...st
+              })),
+              sectionPoints: { ...d.sectionPoints, ...(s.sectionPoints || {}) },
+              chairOrders: { ...d.chairOrders, ...(s.chairOrders || {}) },
+              chairTests: (s.chairTests || []).map(t => ({ rewardsGiven: false, ...t })),
+          };
       }
 
       function usePersistentState() {
         const [state, setRawState] = useState(() => {
-          try {
-            const raw = localStorage.getItem(LS_KEY);
-            return hydrateState(raw ? JSON.parse(raw) : defaultState());
-          } catch (e) {
-            return defaultState();
-          }
+          try { return hydrateState(JSON.parse(localStorage.getItem(LS_KEY) || "null")); } 
+          catch { return defaultState(); }
         });
-
-        // Smart Cloud Sync Engine & Same-Browser Real-Time Sync
-        useEffect(() => {
-            // Real-time sync across tabs in the same browser!
-            const handleStorageChange = (e) => {
-                if (e.key === LS_KEY) {
-                    try {
-                        const raw = localStorage.getItem(LS_KEY);
-                        setRawState(hydrateState(raw ? JSON.parse(raw) : defaultState()));
-                    } catch(err) {}
-                }
-            };
-            window.addEventListener('storage', handleStorageChange);
-
-            // Fetch from Cloud (GitHub Pages workflow)
-            if (window.location.protocol.startsWith('http')) {
-                fetch('data.json', { cache: 'no-store' })
-                    .then(r => {
-                        if (!r.ok) throw new Error("No data.json");
-                        return r.json();
-                    })
-                    .then(cloudData => {
-                        setRawState(prev => {
-                            const localTime = prev._lastModified || 0;
-                            const cloudTime = cloudData._lastModified || 0;
-                            if (cloudTime > localTime || !prev.students.length) {
-                                return hydrateState(cloudData);
-                            }
-                            return prev;
-                        });
-                    })
-                    .catch(() => {});
-            }
-
-            return () => window.removeEventListener('storage', handleStorageChange);
-        }, []);
-
         const setState = useCallback((updater) => {
             setRawState(prev => {
-                const nextState = typeof updater === 'function' ? updater(prev) : updater;
-                const finalState = { ...nextState, _lastModified: Date.now() };
-                try {
-                    localStorage.setItem(LS_KEY, JSON.stringify(finalState));
-                } catch(e) {}
-                return finalState;
+                const next = typeof updater === 'function' ? updater(prev) : updater;
+                const final = { ...next, _lastModified: Date.now() };
+                localStorage.setItem(LS_KEY, JSON.stringify(final));
+                return final;
             });
         }, []);
-
-        return [state, setState, setRawState];
+        return [state, setState];
       }
 
-      // ------------------------------------ UI Primitives ------------------------------------
+      // --- Components ---
       function Button({ className = "", disabled, ...props }) {
-        return (
-          <button
-            disabled={disabled}
-            className={
-              `px-3 py-2 rounded-2xl shadow-sm border bg-white hover:bg-gray-50 active:scale-[0.99] transition ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ` +
-              className
-            }
-            {...props}
-          />
-        );
+        return <button disabled={disabled} className={`px-3 py-2 rounded-2xl shadow-sm border bg-white hover:bg-gray-50 active:scale-[0.99] transition ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`} {...props} />;
       }
-
       function Card({ title, actions, children }) {
-        return (
-          <div className="rounded-2xl border bg-white shadow p-4 no-print">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="text-lg font-semibold">{title}</h2>
-              <div className="flex items-center gap-2">{actions}</div>
-            </div>
-            {children}
-          </div>
-        );
+        return <div className="rounded-2xl border bg-white shadow p-4 no-print"><div className="flex items-center justify-between gap-2 mb-3"><h2 className="text-lg font-semibold">{title}</h2><div className="flex items-center gap-2">{actions}</div></div>{children}</div>;
       }
-
-      function Input({ className = "", ...props }) {
-        return (
-          <input
-            className={
-              "px-3 py-2 border rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-blue-300 " +
-              className
-            }
-            {...props}
-          />
-        );
-      }
-
-      function Select({ className = "", ...props }) {
-        return (
-          <select
-            className={
-              "px-3 py-2 border rounded-xl w-full bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 " +
-              className
-            }
-            {...props}
-          />
-        );
-      }
-
-      function Section({ title, children }) {
-        return (
-          <div className="space-y-3">
-            <h3 className="text-base font-semibold text-gray-700">{title}</h3>
-            {children}
-          </div>
-        );
-      }
-
-      function Tabs({ tabs, current, onChange }) {
-        return (
-          <div className="flex flex-wrap items-center gap-2 no-print">
-            {tabs.map((t) => (
-              <Button
-                key={t}
-                className={
-                  (current === t
-                    ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-600 font-bold"
-                    : "text-gray-600") + " min-w-[8rem]"
-                }
-                onClick={() => onChange(t)}
-              >
-                {t}
-              </Button>
-            ))}
-          </div>
-        );
-      }
-
+      function Input({ className="", ...props }) { return <input className={`px-3 py-2 border rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-blue-300 ${className}`} {...props} />; }
+      function Select({ className="", ...props }) { return <select className={`px-3 py-2 border rounded-xl w-full bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 ${className}`} {...props} />; }
+      
       const LogoSVG = ({ className="h-16 w-16" }) => (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" className={`${className} drop-shadow-md`}>
-            <defs>
-                <linearGradient id="columbiaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#9BDDFF" stopOpacity="1" />
-                    <stop offset="100%" stopColor="#7BAFD4" stopOpacity="1" />
-                </linearGradient>
-            </defs>
+            <defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#9BDDFF"/><stop offset="100%" stopColor="#7BAFD4"/></linearGradient></defs>
             <path d="M 20 20 L 180 20 L 180 100 C 180 160 100 190 100 190 C 100 190 20 160 20 100 Z" fill="#002147"/>
-            <path d="M 30 30 L 170 30 L 170 98 C 170 150 100 178 100 178 C 100 178 30 150 30 98 Z" fill="none" stroke="url(#columbiaGrad)" strokeWidth="4"/>
-            <path d="M 145 45 L 115 52 L 95 48 L 82 58 L 45 70 L 40 85 L 60 85 L 75 110 L 100 145 L 135 110 L 130 80 L 155 60 Z" fill="url(#columbiaGrad)"/>
-            <polygon points="95,67 103,64 103,70" fill="#002147"/>
-            <polygon points="125,58 148,38 140,68" fill="#FFFFFF"/>
-            <rect x="108" y="108" width="35" height="10" transform="rotate(-45 108 108)" fill="#FFFFFF"/>
-            <text x="100" y="165" fontFamily="Impact, sans-serif" fontSize="20" fill="#FFFFFF" textAnchor="middle" letterSpacing="1">BATTALION</text>
+            <path d="M 30 30 L 170 30 L 170 98 C 170 150 100 178 100 178 C 100 178 30 150 30 98 Z" fill="none" stroke="url(#g)" strokeWidth="4"/>
+            <path d="M 145 45 L 115 52 L 95 48 L 82 58 L 45 70 L 40 85 L 60 85 L 75 110 L 100 145 L 135 110 L 130 80 L 155 60 Z" fill="url(#g)"/>
+            <text x="100" y="165" fontFamily="Impact" fontSize="20" fill="#FFFFFF" textAnchor="middle" letterSpacing="1">BATTALION</text>
         </svg>
       );
 
-      // ------------------------------------ Audio ------------------------------------
-      function useAudioBank(settings = {}) {
-        const audioRef = useRef(null);
-
-        useEffect(() => {
-          if (audioRef.current) return;
-          const make = (src) => {
-            const a = new Audio(src);
-            a.preload = "auto";
-            return a;
-          };
-          audioRef.current = {
-            tournamentStart: make(SOUND_FILES.tournamentStart),
-            betweenRoundsA: make(SOUND_FILES.betweenRoundsA),
-            betweenRoundsB: make(SOUND_FILES.betweenRoundsB),
-            victory: make(SOUND_FILES.victory),
-            deepRun: make(SOUND_FILES.deepRun),
-          };
-        }, []);
-
-        useEffect(() => {
-          const vol = clamp(Number(settings?.volume ?? 0.7), 0, 1);
-          Object.values(audioRef.current || {}).forEach((a) => {
-            if (a) a.volume = vol;
-          });
-        }, [settings?.volume]);
-
-        function play(key) {
-          if (!settings?.soundEnabled) return;
-          const a = audioRef.current?.[key];
-          if (!a) return;
-          try {
-            a.pause();
-            a.currentTime = 0;
-            a.play();
-          } catch (_) {}
-        }
-
-        return { play };
-      }
-
-      // ------------------------------------ Students & Store ------------------------------------
-      function StudentsManager({ state, setState }) {
-        const [filterInstrument, setFilterInstrument] = useState("");
-        const [q, setQ] = useState("");
-        const [newStudent, setNewStudent] = useState({ name: "", instrument: INSTRUMENTS[0] });
-        
-        // Local state for dropdowns in table
-        const [storeSelections, setStoreSelections] = useState({});
-
-        const { play: playSound } = useAudioBank(state.settings);
-
-        const students = useMemo(() => {
-          let arr = state.students;
-          if (filterInstrument) arr = arr.filter((s) => s.instrument === filterInstrument);
-          if (q.trim()) {
-            const qq = q.trim().toLowerCase();
-            arr = arr.filter((s) => s.name.toLowerCase().includes(qq));
-          }
-          return [...arr].sort((a, b) => a.name.localeCompare(b.name));
-        }, [state.students, filterInstrument, q]);
-
-        function addStudent() {
-          if (!newStudent.name.trim()) return;
-          const s = {
-            id: uid(),
-            name: newStudent.name.trim(),
-            instrument: newStudent.instrument,
-            bandBucks: 0,
-            dailyGrades: {},
-            notes: "",
-          };
-          setState((prev) => ({ ...prev, students: [...prev.students, s] }));
-          setNewStudent({ name: "", instrument: INSTRUMENTS[0] });
-        }
-
-        function removeStudent(id) {
-          if (!confirm("Remove this student?")) return;
-          setState((prev) => ({
-            ...prev,
-            students: prev.students.filter((s) => s.id !== id),
-            chairTests: prev.chairTests.map((t) => {
-              const { [id]: _removed, ...rest } = t.scores || {};
-              return { ...t, scores: rest };
-            }),
-          }));
-        }
-
-        function setBandBucks(id, delta) {
-          setState((prev) => ({
-            ...prev,
-            students: prev.students.map((s) =>
-              s.id === id ? { ...s, bandBucks: Math.max(0, (s.bandBucks || 0) + delta) } : s
-            ),
-          }));
-        }
-
-        function buyStoreItem(studentId) {
-            const itemId = storeSelections[studentId];
-            if (!itemId) return;
-            const item = STORE_ITEMS.find(i => i.id === itemId);
-            const student = state.students.find(s => s.id === studentId);
-            
-            if (!item || !student) return;
-            if ((student.bandBucks || 0) < item.cost) {
-                alert("Not enough Band Bucks!");
-                return;
-            }
-            
-            if (confirm(`Confirm purchase: ${item.name} for ${item.cost} bucks?`)) {
-                setBandBucks(studentId, -item.cost);
-                setStoreSelections(prev => ({ ...prev, [studentId]: "" }));
-            }
-        }
-
-        function updateStudentInstrument(id, newInstrument) {
-          setState((prev) => {
-            const students = (prev.students || []).map((s) =>
-              s.id === id ? { ...s, instrument: newInstrument } : s
-            );
-            const chairOrders = { ...(prev.chairOrders || {}) };
-            INSTRUMENTS.forEach((inst) => {
-              chairOrders[inst] = (chairOrders[inst] || []).filter((x) => x !== id);
-            });
-            chairOrders[newInstrument] = [...(chairOrders[newInstrument] || []), id];
-            return { ...prev, students, chairOrders };
-          });
-        }
-
-        function updateStudentName(id, newName) {
-          setState((prev) => ({
-            ...prev,
-            students: (prev.students || []).map((s) =>
-              s.id === id ? { ...s, name: newName } : s
-            ),
-          }));
-        }
-
-        return (
-          <Card
-            title="Students & Band Store"
-            actions={
-              <div className="flex gap-2">
-                <Select value={filterInstrument} onChange={(e) => setFilterInstrument(e.target.value)}>
-                  <option value="">All Instruments</option>
-                  {INSTRUMENTS.map((i) => (
-                    <option key={i} value={i}>{i}</option>
-                  ))}
-                </Select>
-                <Input placeholder="Search name…" value={q} onChange={(e) => setQ(e.target.value)} />
-              </div>
-            }
-          >
-            <Section title="Add Student">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <Input
-                  placeholder="Student name"
-                  value={newStudent.name}
-                  onChange={(e) => setNewStudent((s) => ({ ...s, name: e.target.value }))}
-                />
-                <Select
-                  value={newStudent.instrument}
-                  onChange={(e) => setNewStudent((s) => ({ ...s, instrument: e.target.value }))}
-                >
-                  {INSTRUMENTS.map((i) => (
-                    <option key={i} value={i}>{i}</option>
-                  ))}
-                </Select>
-                <Button onClick={addStudent} className="bg-blue-600 text-white border-blue-600">Add</Button>
-              </div>
-            </Section>
-
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-left text-gray-600 border-b">
-                    <th className="py-2 pr-4">Name</th>
-                    <th className="py-2 pr-4">Instrument</th>
-                    <th className="py-2 pr-4">Bank</th>
-                    <th className="py-2 pr-4">Manage Bucks</th>
-                    <th className="py-2 pr-4">Band Store Purchases</th>
-                    <th className="py-2 pr-4">Danger</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((s) => (
-                    <tr key={s.id} className="border-b hover:bg-gray-50">
-                      <td className="py-2 pr-4 font-medium">
-                        <input
-                          className="px-2 py-1 border border-transparent rounded hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 md:w-48 bg-transparent transition-colors"
-                          value={s.name}
-                          onChange={(e) => updateStudentName(s.id, e.target.value)}
-                        />
-                        <div 
-                          className="text-xs text-blue-600 mt-1 ml-2 cursor-pointer hover:underline"
-                          onClick={() => playSound(state.settings?.clickSongKey || "betweenRoundsA")}
-                        >
-                          🎵 Play Walk-up Song
-                        </div>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <Select
-                          value={s.instrument}
-                          onChange={(e) => updateStudentInstrument(s.id, e.target.value)}
-                        >
-                          {INSTRUMENTS.map((i) => (
-                            <option key={i} value={i}>{i}</option>
-                          ))}
-                        </Select>
-                      </td>
-                      <td className="py-2 pr-4 font-bold text-green-700 text-lg">
-                          ${s.bandBucks || 0}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <div className="flex gap-1">
-                          <Button className="px-2 py-1" onClick={() => setBandBucks(s.id, +1)}>+1</Button>
-                          <Button className="px-2 py-1" onClick={() => setBandBucks(s.id, +10)}>+10</Button>
-                          <Button className="px-2 py-1 text-red-600" onClick={() => setBandBucks(s.id, -1)}>-1</Button>
-                        </div>
-                      </td>
-                      <td className="py-2 pr-4">
-                          <div className="flex gap-2 items-center">
-                              <Select 
-                                  className="text-xs py-1" 
-                                  value={storeSelections[s.id] || ""} 
-                                  onChange={e => setStoreSelections(prev => ({...prev, [s.id]: e.target.value}))}
-                              >
-                                  <option value="">-- Shop --</option>
-                                  {STORE_ITEMS.map(item => (
-                                      <option key={item.id} value={item.id} disabled={(s.bandBucks || 0) < item.cost}>
-                                          {item.name} (${item.cost})
-                                      </option>
-                                  ))}
-                              </Select>
-                              <Button 
-                                  className="bg-green-600 text-white border-green-700 px-2 py-1 text-xs font-bold"
-                                  disabled={!storeSelections[s.id]}
-                                  onClick={() => buyStoreItem(s.id)}
-                              >
-                                  Buy
-                              </Button>
-                          </div>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <Button className="border-red-600 text-red-700 px-2 py-1 text-xs" onClick={() => removeStudent(s.id)}>Remove</Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {students.length === 0 && (
-                    <tr><td className="py-3 text-gray-500" colSpan={6}>No students yet. Add some above.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        );
-      }
-
-      // ------------------------------------ Daily Grades ------------------------------------
-      function DailyGrades({ state, setState }) {
-        const [date, setDate] = useState(todayISO());
-        const students = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
-
-        function setGrade(studentId, val) {
-          let n = Number(val);
-          if (Number.isNaN(n)) return;
-          n = clamp(n, 0, 200);
-          setState((prev) => ({
-            ...prev,
-            students: prev.students.map((s) =>
-              s.id === studentId ? { ...s, dailyGrades: { ...(s.dailyGrades || {}), [date]: n } } : s
-            ),
-          }));
-        }
-
-        return (
-          <Card title="Daily Grades (out of 200)" actions={<Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />}>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-left text-gray-600">
-                    <th className="py-2 pr-4">Name</th>
-                    <th className="py-2 pr-4">Instrument</th>
-                    <th className="py-2 pr-4">Grade ({date})</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((s) => (
-                    <tr key={s.id} className="border-t">
-                      <td className="py-2 pr-4 font-medium">{s.name}</td>
-                      <td className="py-2 pr-4">{s.instrument}</td>
-                      <td className="py-2 pr-4">
-                        <Input
-                          type="number" step="1" min="0" max="200"
-                          value={(s.dailyGrades && s.dailyGrades[date]) ?? ""}
-                          onChange={(e) => setGrade(s.id, e.target.value)}
-                          className="max-w-[8rem]"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        );
-      }
-
-      // ------------------------------------ Chair Tests ------------------------------------
-      function ChairTests({ state, setState }) {
-        const [name, setName] = useState("");
-        const [date, setDate] = useState(todayISO());
-        const studentsByInstrument = useMemo(() => {
-          const map = {};
-          INSTRUMENTS.forEach((i) => (map[i] = []));
-          state.students.forEach((s) => map[s.instrument]?.push(s));
-          Object.values(map).forEach((arr) => arr.sort((a, b) => a.name.localeCompare(b.name)));
-          return map;
-        }, [state.students]);
-
-        const activeTests = (state.chairTests || []).filter(t => !t.isArchived);
-
-        function createTest() {
-          if (!name.trim()) return;
-          setState((prev) => ({
-            ...prev,
-            chairTests: [...prev.chairTests, { id: uid(), name: name.trim(), date, scores: {}, isArchived: false, bucksAwarded: false }],
-          }));
-          setName("");
-          setDate(todayISO());
-        }
-
-        function setScore(testId, studentId, value) {
-          const score = parseScore(value, 0, 10);
-          setState((prev) => ({
-            ...prev,
-            chairTests: prev.chairTests.map((t) =>
-              t.id === testId ? { ...t, scores: { ...(t.scores || {}), [studentId]: score } } : t
-            ),
-          }));
-        }
-
-        function archiveTest(id) {
-          if (!confirm("Send this test to the Archives?")) return;
-          setState(prev => ({
-              ...prev,
-              chairTests: prev.chairTests.map(t => t.id === id ? { ...t, isArchived: true } : t)
-          }));
-        }
-
-        function deleteTest(id) {
-          if (!confirm("Delete this chair test permanently?")) return;
-          setState((prev) => ({ ...prev, chairTests: prev.chairTests.filter((t) => t.id !== id) }));
-        }
-
-        function awardBucksForTest(testId) {
-            const test = state.chairTests.find(t => t.id === testId);
-            if (!test) return;
-            if (test.bucksAwarded) {
-                alert("Bucks already awarded for this test!");
-                return;
-            }
-            
-            let updates = {};
-            Object.entries(test.scores || {}).forEach(([sId, scoreStr]) => {
-                const score = Number(scoreStr);
-                if (score >= 9.4) updates[sId] = 20;
-                else if (score >= 8.5) updates[sId] = 10;
-            });
-
-            setState(prev => {
-                const students = prev.students.map(s => {
-                    if (updates[s.id]) return { ...s, bandBucks: (s.bandBucks || 0) + updates[s.id] };
-                    return s;
-                });
-                const chairTests = prev.chairTests.map(t => 
-                    t.id === testId ? { ...t, bucksAwarded: true } : t
-                );
-                return { ...prev, students, chairTests };
-            });
-            alert("Band Bucks successfully awarded for high scores!");
-        }
-
-        return (
-          <div className="space-y-4">
-            <Card title="Create Chair Test" actions={null}>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                <Input placeholder="Test name (e.g., Oct 21 Chair Test)" value={name} onChange={(e) => setName(e.target.value)} />
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                <Button onClick={createTest} className="bg-blue-600 text-white border-blue-600 md:col-span-2">Create Test</Button>
-              </div>
-            </Card>
-
-            {activeTests.map((t) => (
-              <Card
-                key={t.id}
-                title={`${t.name} — ${t.date}`}
-                actions={
-                  <div className="flex gap-2">
-                      <Button 
-                          className={`font-bold ${t.bucksAwarded ? 'bg-gray-100 text-gray-400' : 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'}`}
-                          onClick={() => awardBucksForTest(t.id)}
-                          disabled={t.bucksAwarded}
-                      >
-                          {t.bucksAwarded ? "✓ Bucks Awarded" : "💰 Award Test Bucks"}
-                      </Button>
-                      <Button className="border-yellow-600 text-yellow-700" onClick={() => archiveTest(t.id)}>Archive</Button>
-                      <Button className="border-red-600 text-red-700" onClick={() => deleteTest(t.id)}>Delete</Button>
-                  </div>
-                }
-              >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Section title="Enter Scores (0–10, decimals OK)">
-                    <div className="space-y-4">
-                      {INSTRUMENTS.map((inst) => (
-                        <div key={inst} className="border rounded-xl p-3">
-                          <div className="font-semibold mb-2">{inst}</div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {(studentsByInstrument[inst] || []).map((s) => (
-                              <div key={s.id} className="flex items-center gap-2">
-                                <div className="w-40 truncate">{s.name}</div>
-                                <Input
-                                  type="number" step="0.1" min="0" max="10"
-                                  value={t.scores?.[s.id] ?? ""}
-                                  onChange={(e) => setScore(t.id, s.id, e.target.value)}
-                                  className="max-w-[7rem]"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </Section>
-                </div>
-              </Card>
-            ))}
-            {activeTests.length === 0 && <p className="text-gray-500 italic">No active chair tests. Create one above.</p>}
-          </div>
-        );
-      }
-
-      // ------------------------------------ Chairs Manager (Admin) ------------------------------------
-      function ChairsManager({ state, setState }) {
-        const [selectedTestId, setSelectedTestId] = useState("");
-        const [selectedTourneyId, setSelectedTourneyId] = useState("");
-
-        const tests = (state.chairTests || []).filter(t => !t.isArchived);
-        const tourneys = (state.tournaments || []).filter(t => !t.isArchived && t.testId === selectedTestId);
-
-        useEffect(() => {
-            if (!selectedTestId && tests.length > 0) setSelectedTestId(tests[0].id);
-        }, [tests]);
-
-        function handleGenerate() {
-            if (!selectedTestId) {
-                alert("Please select a Base Chair Test first.");
-                return;
-            }
-            
-            const test = state.chairTests.find(t => t.id === selectedTestId);
-            const tourney = state.tournaments.find(t => t.id === selectedTourneyId);
-            
-            const newOrders = {};
-            INSTRUMENTS.forEach(inst => {
-                const instStudents = state.students.filter(s => s.instrument === inst);
-                let rankedIds = [];
-                
-                if (!tourney) {
-                    // Score only
-                    rankedIds = instStudents
-                        .map(s => ({ id: s.id, score: Number(test?.scores?.[s.id] || 0) }))
-                        .sort((a,b) => b.score - a.score)
-                        .map(x => x.id);
-                } else {
-                    // Tournament Reach + Random Tiebreaker + Score for non-participants
-                    const roundReached = {};
-                    tourney.bracket.rounds.forEach((round, rIdx) => {
-                        round.matches.forEach(m => {
-                            if (m.p1Id) roundReached[m.p1Id] = rIdx;
-                            if (m.p2Id) roundReached[m.p2Id] = rIdx;
-                            if (m.winnerId) roundReached[m.winnerId] = rIdx + 1; 
-                        });
-                    });
-                    
-                    const tourneyPlayers = instStudents.filter(s => roundReached[s.id] !== undefined);
-                    const nonTourney = instStudents.filter(s => roundReached[s.id] === undefined);
-                    
-                    // Sort tournament players
-                    tourneyPlayers.sort((a,b) => {
-                        if (roundReached[b.id] !== roundReached[a.id]) {
-                            return roundReached[b.id] - roundReached[a.id];
-                        }
-                        // Luck of the draw for ties!
-                        return Math.random() - 0.5;
-                    });
-                    
-                    // Sort non-tournament players by score
-                    nonTourney.sort((a,b) => Number(test?.scores?.[b.id] || 0) - Number(test?.scores?.[a.id] || 0));
-                    
-                    rankedIds = [...tourneyPlayers.map(s=>s.id), ...nonTourney.map(s=>s.id)];
-                }
-                newOrders[inst] = rankedIds;
-            });
-            
-            setState(prev => ({ ...prev, chairOrders: newOrders }));
-        }
-
-        function moveChair(inst, index, direction) {
-            setState(prev => {
-                const arr = [...(prev.chairOrders[inst] || [])];
-                if (direction === 'up' && index > 0) {
-                    [arr[index-1], arr[index]] = [arr[index], arr[index-1]];
-                } else if (direction === 'down' && index < arr.length - 1) {
-                    [arr[index+1], arr[index]] = [arr[index], arr[index+1]];
-                }
-                return { ...prev, chairOrders: { ...prev.chairOrders, [inst]: arr } };
-            });
-        }
-
-        return (
-           <div className="space-y-6">
-               <Card title="Auto-Generate Chair Order">
-                   <div className="flex flex-col md:flex-row gap-4 items-end">
-                       <div className="w-full">
-                           <label className="block text-sm font-bold text-[#002147] mb-1">Base Chair Test</label>
-                           <Select value={selectedTestId} onChange={(e) => { setSelectedTestId(e.target.value); setSelectedTourneyId(""); }}>
-                               <option value="">-- Select Test --</option>
-                               {tests.map(t => <option key={t.id} value={t.id}>{t.name} ({t.date})</option>)}
-                           </Select>
-                       </div>
-                       <div className="w-full">
-                           <label className="block text-sm font-bold text-[#002147] mb-1">Associated Tournament (Optional)</label>
-                           <Select value={selectedTourneyId} onChange={(e) => setSelectedTourneyId(e.target.value)}>
-                               <option value="">-- No Tournament (Score Only) --</option>
-                               {tourneys.map(t => <option key={t.id} value={t.id}>{t.name} ({t.date})</option>)}
-                           </Select>
-                       </div>
-                       <Button onClick={handleGenerate} className="bg-[#002147] text-white font-bold whitespace-nowrap px-6">⚡ Auto-Generate</Button>
-                   </div>
-               </Card>
-
-               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
-                    {INSTRUMENTS.map(inst => {
-                        const order = state.chairOrders[inst] || [];
-                        return (
-                            <div key={inst} className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-t-[#7BAFD4]">
-                                <h3 className="font-black text-[#002147] text-xl mb-3 border-b pb-2 uppercase tracking-wide">{inst}</h3>
-                                {order.length === 0 ? <p className="text-gray-400 italic text-sm">No chairs set.</p> : (
-                                    <div className="flex flex-col gap-2">
-                                        {order.map((id, idx) => {
-                                            const s = state.students.find(x => x.id === id);
-                                            if (!s) return null;
-                                            return (
-                                                <div key={id} className="flex justify-between items-center bg-gray-50 p-2 rounded border hover:bg-gray-100 transition">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="font-black text-gray-400 w-8 text-right text-lg">#{idx+1}</span>
-                                                        <span className="font-bold text-[#002147]">{s.name}</span>
-                                                    </div>
-                                                    <div className="flex gap-1 no-print">
-                                                        <Button onClick={() => moveChair(inst, idx, 'up')} disabled={idx === 0} className="px-2 py-1 text-xs bg-white text-gray-600">▲</Button>
-                                                        <Button onClick={() => moveChair(inst, idx, 'down')} disabled={idx === order.length - 1} className="px-2 py-1 text-xs bg-white text-gray-600">▼</Button>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )
-                    })}
-                </div>
-           </div>
-        );
-      }
-
-      // ------------------------------------ Public Chairs View ------------------------------------
-      function PublicChairs({ state }) {
+      // --- Student Store Logic ---
+      function StoreModal({ student, onClose, onPurchase }) {
+          if (!student) return null;
           return (
-              <div className="space-y-6">
-                  <div className="w-full bg-gradient-to-r from-[#002147] to-[#001530] text-white p-6 rounded-2xl shadow-lg border-b-4 border-[#7BAFD4] flex flex-col items-center justify-center text-center">
-                      <h1 className="text-4xl italic font-black uppercase tracking-wider text-shadow-md mb-2">Official Chair Order</h1>
-                      <p className="text-blue-300 font-bold tracking-wide uppercase text-sm">Whippet Barking Battalion Rankings</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {INSTRUMENTS.map(inst => {
-                        const order = state.chairOrders[inst] || [];
-                        if (order.length === 0) return null;
-                        
-                        return (
-                            <div key={inst} className="bg-white rounded-xl shadow-md border-2 border-[#002147] overflow-hidden">
-                                <div className="bg-[#002147] text-white p-3 text-center">
-                                    <h3 className="text-xl font-black uppercase tracking-widest">{inst}</h3>
-                                </div>
-                                <div className="p-0">
-                                    {order.map((id, idx) => {
-                                        const s = state.students.find(x => x.id === id);
-                                        if (!s) return null;
-                                        return (
-                                            <div key={id} className={`flex items-center px-4 py-3 border-b last:border-b-0 ${idx === 0 ? 'bg-[#FFFDF0] font-black' : 'bg-white font-bold text-gray-700'}`}>
-                                                <div className={`w-10 text-right mr-4 ${idx===0 ? 'text-yellow-600 text-xl' : 'text-gray-400'}`}>
-                                                    #{idx+1}
-                                                </div>
-                                                <div className="text-lg uppercase tracking-wide">
-                                                    {s.name}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )
-                    })}
-                  </div>
-              </div>
-          )
-      }
-
-      // ------------------------------------ Archives ------------------------------------
-      function Archives({ state, setState }) {
-          const archivedTests = (state.chairTests || []).filter(t => t.isArchived);
-          const archivedTournaments = (state.tournaments || []).filter(t => t.isArchived);
-
-          function restoreTest(id) {
-              setState(prev => ({ ...prev, chairTests: prev.chairTests.map(t => t.id === id ? { ...t, isArchived: false } : t) }));
-          }
-          function deleteTest(id) {
-              if(!confirm("Permanently delete?")) return;
-              setState(prev => ({ ...prev, chairTests: prev.chairTests.filter(t => t.id !== id) }));
-          }
-
-          function restoreTournament(id) {
-              setState(prev => ({ ...prev, tournaments: prev.tournaments.map(t => t.id === id ? { ...t, isArchived: false } : t) }));
-          }
-          function deleteTournament(id) {
-              if(!confirm("Permanently delete?")) return;
-              setState(prev => ({ ...prev, tournaments: prev.tournaments.filter(t => t.id !== id) }));
-          }
-
-          return (
-              <div className="space-y-6">
-                  <Card title="Archived Tournaments">
-                      {archivedTournaments.length === 0 && <p className="text-sm text-gray-500">No archived tournaments.</p>}
-                      <div className="space-y-2">
-                          {archivedTournaments.map(t => (
-                              <div key={t.id} className="flex justify-between items-center p-3 border rounded">
-                                  <div>
-                                      <div className="font-bold text-gray-800">{t.name}</div>
-                                      <div className="text-xs text-gray-500">{t.date} • {t.size}-Seed • Champion: {t.championName || 'None'}</div>
-                                  </div>
-                                  <div className="flex gap-2">
-                                      <Button onClick={() => restoreTournament(t.id)} className="text-blue-600">Restore</Button>
-                                      <Button onClick={() => deleteTournament(t.id)} className="text-red-600 border-red-200">Delete</Button>
-                                  </div>
-                              </div>
-                          ))}
+              <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                      <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-xl font-bold text-[#002147]">Band Store</h3>
+                          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
                       </div>
-                  </Card>
-
-                  <Card title="Archived Chair Tests">
-                      {archivedTests.length === 0 && <p className="text-sm text-gray-500">No archived chair tests.</p>}
-                      <div className="space-y-2">
-                          {archivedTests.map(t => (
-                              <div key={t.id} className="flex justify-between items-center p-3 border rounded">
-                                  <div>
-                                      <div className="font-bold text-gray-800">{t.name}</div>
-                                      <div className="text-xs text-gray-500">{t.date}</div>
-                                  </div>
-                                  <div className="flex gap-2">
-                                      <Button onClick={() => restoreTest(t.id)} className="text-blue-600">Restore</Button>
-                                      <Button onClick={() => deleteTest(t.id)} className="text-red-600 border-red-200">Delete</Button>
-                                  </div>
-                              </div>
-                          ))}
+                      <div className="mb-4 bg-blue-50 p-3 rounded-xl border border-blue-100">
+                          <div className="text-sm text-gray-600">Shopper:</div>
+                          <div className="font-bold text-lg">{student.name}</div>
+                          <div className="text-sm text-gray-600 mt-1">Balance:</div>
+                          <div className="font-black text-2xl text-green-600">${student.bandBucks || 0}</div>
                       </div>
-                  </Card>
-              </div>
-          )
-      }
-
-      // ------------------------------------ Hall of Champions ------------------------------------
-      function HallOfChampions({ state, onPrintCert }) {
-          const champs = {};
-          let currentDefendingChampion = null;
-          let latestDate = "";
-          
-          (state.tournaments || []).forEach(t => {
-              let cName = t.championName;
-              if (!cName && t.championId) cName = state.students.find(s => s.id === t.championId)?.name || "Unknown";
-
-              if (cName && cName !== "Unknown") {
-                  if (!champs[cName]) {
-                      champs[cName] = { name: cName, wins: 0, defenses: -1, titles: [] };
-                  }
-                  champs[cName].wins += 1;
-                  champs[cName].defenses += 1;
-                  champs[cName].titles.push({ tournamentName: t.name, date: t.date });
-                  
-                  // Find the absolute latest active champion
-                  if (!t.isArchived && t.date >= latestDate) {
-                      latestDate = t.date;
-                      currentDefendingChampion = cName;
-                  }
-              }
-          });
-
-          const sortedChamps = Object.values(champs).sort((a,b) => b.wins - a.wins);
-
-          return (
-              <div className="space-y-6">
-                  <div className="w-full bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 text-dark-navy p-6 rounded-2xl shadow-lg border-4 border-yellow-300 flex items-center justify-center gap-6">
-                      <div className="text-6xl drop-shadow-md">🏆</div>
-                      <div className="text-center text-[#002147]">
-                          <h1 className="text-4xl italic font-black uppercase tracking-wider text-shadow-md">Hall of Champions</h1>
-                          <p className="font-bold tracking-wide uppercase text-sm mt-1">The All-Time Greats of the Barking Battalion</p>
-                      </div>
-                      <div className="text-6xl drop-shadow-md">🏆</div>
-                  </div>
-
-                  {currentDefendingChampion && (
-                      <div className="text-center champ-banner-mega p-8 rounded-2xl mx-auto w-full max-w-4xl transform hover:scale-105 transition-transform duration-300 relative overflow-hidden">
-                          <p className="text-[#002147] font-bold uppercase tracking-widest text-sm mb-2 drop-shadow-sm">Current Defending Champion</p>
-                          <h2 className="text-6xl font-black italic text-[#002147] drop-shadow-lg tracking-tighter">{currentDefendingChampion}</h2>
-                          <div className="absolute top-2 right-4 text-5xl opacity-50">👑</div>
-                          <div className="absolute bottom-2 left-4 text-5xl opacity-50">🌟</div>
-                      </div>
-                  )}
-
-                  {sortedChamps.length === 0 ? (
-                      <Card title="Empty Pantheon">
-                          <p className="text-gray-500 text-center py-10">The history books are empty. Await the crowning of the first Champion.</p>
-                      </Card>
-                  ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {sortedChamps.map((c, i) => (
-                              <div key={c.name} className="relative bg-white border-2 border-[#002147] rounded-xl overflow-hidden shadow-md flex flex-col h-full">
-                                  {i === 0 && <div className="absolute top-0 right-0 bg-yellow-400 text-[#002147] font-black text-xs px-2 py-1 rounded-bl-lg border-l border-b border-[#002147] z-10">#1 All-Time</div>}
-                                  <div className="bg-[#002147] text-white p-3 text-center">
-                                      <h3 className="text-xl font-black uppercase">{c.name}</h3>
-                                  </div>
-                                  <div className="p-4 bg-gradient-to-b from-[#f4f7f6] to-white flex-grow">
-                                      <div className="flex justify-between text-sm border-b pb-2 mb-2 font-bold text-gray-700">
-                                          <span>Championships: <span className="text-[#002147] text-lg">{c.wins}</span></span>
-                                          <span>Defenses: <span className="text-[#002147] text-lg">{Math.max(0, c.defenses)}</span></span>
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                          {STORE_ITEMS.map((item, idx) => {
+                              const canAfford = (student.bandBucks || 0) >= item.cost;
+                              return (
+                                  <div key={idx} className={`flex justify-between items-center p-3 border rounded-lg ${canAfford ? 'hover:bg-gray-50' : 'opacity-50 grayscale bg-gray-100'}`}>
+                                      <div>
+                                          <div className="font-bold text-sm text-gray-800">{item.name}</div>
+                                          <div className="text-xs text-gray-500 font-bold">${item.cost}</div>
                                       </div>
-                                      <div className="text-xs text-gray-500 uppercase font-bold mb-2">Titles Held:</div>
-                                      <ul className="text-sm flex flex-col gap-2">
-                                          {c.titles.map((tInfo, idx) => (
-                                              <li key={idx} className="flex justify-between items-center bg-gray-50 border p-2 rounded text-[#002147] font-bold">
-                                                  <span>{tInfo.tournamentName} <span className="text-gray-500 font-normal text-xs ml-1">({tInfo.date})</span></span>
-                                                  <button 
-                                                      onClick={() => onPrintCert({ champName: c.name, date: tInfo.date, tournamentName: tInfo.tournamentName })} 
-                                                      className="text-lg hover:scale-110 active:scale-95 transition-transform no-print"
-                                                      title="Print Certificate for this specific win"
-                                                  >
-                                                      🖨️
-                                                  </button>
-                                              </li>
-                                          ))}
-                                      </ul>
+                                      <Button disabled={!canAfford} onClick={() => onPurchase(student.id, item)} className="text-xs bg-green-600 text-white border-green-700">Buy</Button>
                                   </div>
-                              </div>
-                          ))}
-                      </div>
-                  )}
-              </div>
-          );
-      }
-
-      // ------------------------------------ Certificate View ------------------------------------
-      function CertificateView({ data, onCancel }) {
-          return (
-              <div className="fixed inset-0 z-[100000] bg-gray-200 overflow-y-auto print-cert-only flex justify-center p-8 no-print-bg">
-                  <div className="relative w-[11in] h-[8.5in] bg-white shadow-2xl flex flex-col items-center justify-center p-16 text-center border-[20px] border-double border-[#002147] mx-auto print:shadow-none print:w-full print:h-full print:border-[16px] print:m-0 print:p-12">
-                      
-                      <div className="absolute top-6 right-6 no-print flex gap-2">
-                          <Button onClick={onCancel} className="bg-gray-200 text-gray-800 font-bold border-gray-400">⬅ Back to Hall</Button>
-                          <Button onClick={() => window.print()} className="bg-blue-600 text-white font-bold border-blue-700 shadow-lg">🖨️ Print Now</Button>
-                      </div>
-
-                      <LogoSVG className="h-28 w-28 mb-6" />
-                      
-                      <h1 className="text-5xl font-black uppercase text-[#002147] tracking-widest mb-4 font-serif">Official Certificate of Championship</h1>
-                      <h2 className="text-3xl italic text-gray-600 mb-12">Whippet Barking Battalion</h2>
-                      
-                      <p className="text-2xl mb-4 italic text-gray-800">This certifies that</p>
-                      
-                      <div className="text-7xl font-black text-yellow-600 border-b-4 border-yellow-600 pb-2 mb-10 px-16 inline-block">
-                          {data.champName}
-                      </div>
-                      
-                      <p className="text-xl max-w-3xl mb-16 text-gray-700 leading-relaxed">
-                          Has demonstrated unparalleled musical mastery, exceptional skill, and fierce competitive spirit to triumph over all challengers and claim the ultimate title of <strong>Champion</strong> in the <strong>{data.tournamentName}</strong>.
-                      </p>
-                      
-                      <div className="flex justify-between w-full max-w-4xl px-12 mt-auto">
-                          <div className="flex flex-col items-center">
-                              <div className="w-72 border-b-2 border-black mb-2"></div>
-                              <span className="text-xl font-bold uppercase text-gray-800 tracking-wider">Director's Signature</span>
-                          </div>
-                          <div className="flex flex-col items-center">
-                              <div className="text-2xl font-bold border-b-2 border-black mb-2 px-12 py-1">{data.date}</div>
-                              <span className="text-xl font-bold uppercase text-gray-800 tracking-wider">Date Awarded</span>
-                          </div>
+                              )
+                          })}
                       </div>
                   </div>
               </div>
+          )
+      }
+
+      function StudentsManager({ state, setState }) {
+          const [q, setQ] = useState("");
+          const [newStudent, setNewStudent] = useState({ name: "", instrument: INSTRUMENTS[0] });
+          const [shoppingStudent, setShoppingStudent] = useState(null);
+
+          function addStudent() {
+              if (!newStudent.name.trim()) return;
+              setState(prev => ({ ...prev, students: [...prev.students, { id: uid(), name: newStudent.name.trim(), instrument: newStudent.instrument, bandBucks: 0, dailyGrades: {}, notes: "", purchaseHistory: [] }] }));
+              setNewStudent({ ...newStudent, name: "" });
+          }
+
+          function handlePurchase(id, item) {
+              if (!confirm(`Confirm purchase of "${item.name}" for ${item.cost} bucks?`)) return;
+              setState(prev => ({
+                  ...prev,
+                  students: prev.students.map(s => {
+                      if (s.id !== id) return s;
+                      if ((s.bandBucks || 0) < item.cost) return s;
+                      const record = `${todayISO()}: Purchased ${item.name} (-${item.cost})`;
+                      return { 
+                          ...s, 
+                          bandBucks: s.bandBucks - item.cost,
+                          purchaseHistory: [record, ...(s.purchaseHistory || [])]
+                      };
+                  })
+              }));
+              setShoppingStudent(null);
+          }
+
+          const filtered = state.students.filter(s => s.name.toLowerCase().includes(q.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name));
+
+          return (
+              <div className="space-y-4">
+                  <StoreModal student={shoppingStudent} onClose={() => setShoppingStudent(null)} onPurchase={handlePurchase} />
+                  <Card title="Students" actions={<Input placeholder="Search..." value={q} onChange={e => setQ(e.target.value)} className="w-48"/>}>
+                      <div className="flex gap-2 mb-4">
+                          <Input placeholder="New Name" value={newStudent.name} onChange={e => setNewStudent({...newStudent, name: e.target.value})} />
+                          <Select value={newStudent.instrument} onChange={e => setNewStudent({...newStudent, instrument: e.target.value})}>{INSTRUMENTS.map(i => <option key={i} value={i}>{i}</option>)}</Select>
+                          <Button onClick={addStudent} className="bg-blue-600 text-white font-bold">Add</Button>
+                      </div>
+                      <div className="overflow-x-auto">
+                          <table className="w-full text-sm text-left">
+                              <thead className="text-gray-500 border-b"><tr><th className="py-2">Name</th><th>Instrument</th><th>Bucks</th><th>Actions</th></tr></thead>
+                              <tbody>
+                                  {filtered.map(s => (
+                                      <tr key={s.id} className="border-b hover:bg-gray-50">
+                                          <td className="py-2 font-medium">
+                                              {s.name}
+                                              {s.purchaseHistory?.length > 0 && <div className="text-xs text-gray-400 mt-1">Last buy: {s.purchaseHistory[0]}</div>}
+                                          </td>
+                                          <td>{s.instrument}</td>
+                                          <td className="font-bold text-green-700">{s.bandBucks}</td>
+                                          <td>
+                                              <div className="flex gap-2">
+                                                  <Button onClick={() => setShoppingStudent(s)} className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">🛒 Shop</Button>
+                                                  <Button onClick={() => setState(prev => ({...prev, students: prev.students.map(x => x.id === s.id ? {...x, bandBucks: x.bandBucks + 1} : x)}))}>+1</Button>
+                                                  <Button onClick={() => setState(prev => ({...prev, students: prev.students.map(x => x.id === s.id ? {...x, bandBucks: x.bandBucks + 5} : x)}))}>+5</Button>
+                                                  <Button onClick={() => setState(prev => ({...prev, students: prev.students.filter(x => x.id !== s.id)}))} className="text-red-600 border-red-100">Del</Button>
+                                              </div>
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </Card>
+              </div>
           );
       }
 
-      // ------------------------------------ Visual ESPN Bracket Component ------------------------------------
+      function ChairTests({ state, setState }) {
+          const [name, setName] = useState("");
+          const activeTests = state.chairTests.filter(t => !t.isArchived);
 
+          function createTest() {
+              if(!name.trim()) return;
+              setState(prev => ({ ...prev, chairTests: [...prev.chairTests, { id: uid(), name: name.trim(), date: todayISO(), scores: {}, rewardsGiven: false, isArchived: false }] }));
+              setName("");
+          }
+
+          function autoAward(testId) {
+              const test = state.chairTests.find(t => t.id === testId);
+              if (test.rewardsGiven) return alert("Rewards already processed for this test!");
+              if (!confirm("Auto-Award Band Bucks based on scores?\n\n8.5 - 9.3 = +10 Bucks\n9.4 - 10.0 = +20 Bucks\n\nThis will apply to all students with scores entered.")) return;
+
+              setState(prev => {
+                  const t = prev.chairTests.find(x => x.id === testId);
+                  const scores = t.scores || {};
+                  const students = prev.students.map(s => {
+                      const score = parseFloat(scores[s.id]);
+                      let bonus = 0;
+                      if (!isNaN(score)) {
+                          if (score >= 9.4) bonus = 20;
+                          else if (score >= 8.5) bonus = 10;
+                      }
+                      return bonus > 0 ? { ...s, bandBucks: (s.bandBucks || 0) + bonus } : s;
+                  });
+                  const tests = prev.chairTests.map(x => x.id === testId ? { ...x, rewardsGiven: true } : x);
+                  return { ...prev, students, chairTests: tests };
+              });
+          }
+
+          return (
+              <div className="space-y-4">
+                  <Card title="New Chair Test"><div className="flex gap-2"><Input value={name} onChange={e => setName(e.target.value)} placeholder="Test Name" /><Button onClick={createTest} className="bg-blue-600 text-white font-bold">Create</Button></div></Card>
+                  {activeTests.map(t => (
+                      <Card key={t.id} title={`${t.name} (${t.date})`} actions={
+                          <div className="flex gap-2">
+                              {!t.rewardsGiven ? 
+                                  <Button onClick={() => autoAward(t.id)} className="bg-green-50 text-green-700 border-green-200 font-bold">🎁 Auto-Award Bucks</Button> :
+                                  <span className="text-xs text-green-600 font-bold px-2 py-1 bg-green-50 rounded border border-green-100">Rewards Distributed ✓</span>
+                              }
+                              <Button onClick={() => setState(prev => ({...prev, chairTests: prev.chairTests.map(x => x.id===t.id ? {...x, isArchived:true}:x)}))} className="text-yellow-600">Archive</Button>
+                          </div>
+                      }>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                              {INSTRUMENTS.map(inst => (
+                                  <div key={inst} className="border p-2 rounded">
+                                      <div className="font-bold text-sm mb-2">{inst}</div>
+                                      {state.students.filter(s => s.instrument === inst).map(s => (
+                                          <div key={s.id} className="flex justify-between items-center text-sm py-1 border-b last:border-0">
+                                              <span>{s.name}</span>
+                                              <Input type="number" step="0.1" className="w-16 h-8 text-right" 
+                                                  value={t.scores?.[s.id] || ""} 
+                                                  onChange={e => {
+                                                      const val = e.target.value;
+                                                      setState(prev => ({...prev, chairTests: prev.chairTests.map(x => x.id === t.id ? {...x, scores: {...x.scores, [s.id]: val}} : x)}));
+                                                  }}
+                                              />
+                                          </div>
+                                      ))}
+                                  </div>
+                              ))}
+                          </div>
+                      </Card>
+                  ))}
+              </div>
+          )
+      }
+
+      // --- Tournament Logic with Swapping & Bucks ---
       function seededSlotOrder(size) {
         const slots = [];
-        for (let i = 1; i <= size / 2; i++) {
-          slots.push(i);
-          slots.push(size - i + 1);
-        }
+        for (let i = 1; i <= size / 2; i++) { slots.push(i); slots.push(size - i + 1); }
         return slots; 
       }
 
-      function roundLabel(participants) {
-        if (participants === 2) return "Championship Round";
-        if (participants === 4) return "The Final Four";
-        if (participants === 8) return "Elite Eight";
-        if (participants === 16) return "Sweet 16";
-        if (participants === 32) return "Round of 32";
-        if (participants === 64) return "Opening Round";
-        return `Round of ${participants}`;
-      }
-
-      function BracketView({ tournament, students, onSetWinner, onUpdatePlayer, readOnly }) {
-          const { bracket, seedsById } = tournament;
-          const rounds = bracket.rounds;
-          const numRounds = rounds.length;
-
-          const nameOf = (id) => students.find((s) => s.id === id)?.name || "—";
-          const seedOf = (id) => (id ? (seedsById?.[id] ?? "") : "");
-
-          const currentIdsInR1 = new Set();
-          rounds[0]?.matches.forEach(m => {
-              if (m.p1Id) currentIdsInR1.add(m.p1Id);
-              if (m.p2Id) currentIdsInR1.add(m.p2Id);
-          });
-          const availableStudents = students
-            .filter(s => !currentIdsInR1.has(s.id))
-            .sort((a,b) => a.name.localeCompare(b.name));
-
-          const leftCols = [];
-          const rightCols = [];
-
-          for (let r = 0; r < numRounds - 1; r++) {
-              const matches = rounds[r].matches;
-              const half = matches.length / 2;
-              leftCols.push({ roundIdx: r, label: rounds[r].name, matches: matches.slice(0, half) });
-              rightCols.push({ roundIdx: r, label: rounds[r].name, matches: matches.slice(half) });
-          }
-          rightCols.reverse();
-
-          const finalMatch = rounds[numRounds - 1]?.matches[0];
-          const championId = tournament.championId;
-
-          function renderSlot(match, playerId, isWinner, slotKey, roundIdx) {
-              const seed = seedOf(playerId);
-              const isActive = playerId && !match.winnerId && !readOnly;
-              const isRound1 = roundIdx === 0;
-              const classes = `slot ${isActive ? 'interactable' : ''} ${isWinner ? 'winner' : ''}`;
-              
-              // Only admins can swap names, and only in round 1
-              const showAdminDropdown = isRound1 && !readOnly;
-
-              return (
-                  <div className="slot-wrapper">
-                      <div className={classes} onClick={() => isActive && !showAdminDropdown && onSetWinner(match.id, playerId)}>
-                          {showAdminDropdown ? (
-                              <div className="flex w-full h-full items-center pl-1 bg-yellow-50/30">
-                                  {seed && <span className="text-xs text-gray-500 mr-1 font-normal">#{seed}</span>}
-                                  <select 
-                                      className="w-full h-full text-[0.7rem] bg-transparent outline-none cursor-pointer text-gray-800"
-                                      onChange={(e) => onUpdatePlayer(match.id, slotKey, e.target.value)}
-                                      onClick={(e) => e.stopPropagation()} // Prevent accidental win selection
-                                      value={playerId || ""}
-                                  >
-                                      <option value="">-- Empty Slot --</option>
-                                      {playerId && <option value={playerId} className="font-bold">{nameOf(playerId)}</option>}
-                                      <optgroup label="Available Players">
-                                          {availableStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                      </optgroup>
-                                  </select>
-                                  {isActive && playerId && (
-                                    <button 
-                                        className="bg-green-100 text-green-700 hover:bg-green-200 h-full px-2 border-l border-green-200 flex-shrink-0 font-bold text-xs transition"
-                                        onClick={(e) => { e.stopPropagation(); onSetWinner(match.id, playerId); }}
-                                        title="Declare Winner"
-                                    >✓</button>
-                                  )}
-                              </div>
-                          ) : playerId ? (
-                              <div className="player flex justify-between items-center w-full">
-                                  <span className="truncate">
-                                      {seed && <span className="text-xs text-gray-500 mr-1 font-normal">#{seed}</span>}
-                                      {nameOf(playerId)}
-                                  </span>
-                              </div>
-                          ) : (
-                              <div className="player text-gray-400 italic">TBD</div>
-                          )}
-                      </div>
-                  </div>
-              );
-          }
-
-          return (
-              <div className="bracket-wrapper">
-                  <div className="bracket-headers">
-                      {leftCols.map((c, i) => <div key={`lh-${i}`} className="h-col">{c.label}</div>)}
-                      <div className="h-col center">Championship Round</div>
-                      {rightCols.map((c, i) => <div key={`rh-${i}`} className="h-col">{c.label}</div>)}
-                  </div>
-
-                  <div className="bracket-body relative mt-6">
-                      <div className="region-watermark wm-nocap">No Cap</div>
-                      <div className="region-watermark wm-aura">Aura</div>
-                      <div className="region-watermark wm-vibe">Vibe Check</div>
-                      <div className="region-watermark wm-goated">Goated</div>
-
-                      {leftCols.map((col, cIdx) => (
-                          <div key={`lcol-${cIdx}`} className={`column left-side ${cIdx === leftCols.length - 1 ? 'no-lines' : ''}`}>
-                              {col.matches.map((m, mIdx) => (
-                                  <div key={m.id} className="matchup">
-                                      {renderSlot(m, m.p1Id, m.winnerId === m.p1Id, 'p1Id', col.roundIdx)}
-                                      {renderSlot(m, m.p2Id, m.winnerId === m.p2Id, 'p2Id', col.roundIdx)}
-                                  </div>
-                              ))}
-                          </div>
-                      ))}
-
-                      <div className="column center-col">
-                          {finalMatch && (
-                            <div className="center-area mt-16">
-                                <div className="championship-row">
-                                    {renderSlot(finalMatch, finalMatch.p1Id, finalMatch.winnerId === finalMatch.p1Id, 'p1Id', numRounds - 1)}
-                                    <div className="vs-text">VS</div>
-                                    {renderSlot(finalMatch, finalMatch.p2Id, finalMatch.winnerId === finalMatch.p2Id, 'p2Id', numRounds - 1)}
-                                </div>
-                                <div className="champion-connector-horizontal"></div>
-                                <div className="champion-connector-vertical"></div>
-                                <div className="champion-slot-wrapper">
-                                    <div className="slot">
-                                        {championId ? (tournament.championName || nameOf(championId)) : ""}
-                                    </div>
-                                    <div className="champ-label">🏆 Championship Belt Winner 🏆</div>
-                                </div>
-                            </div>
-                          )}
-                      </div>
-
-                      {rightCols.map((col, cIdx) => (
-                          <div key={`rcol-${cIdx}`} className={`column right-side ${cIdx === 0 ? 'no-lines' : ''}`}>
-                              {col.matches.map((m, mIdx) => (
-                                  <div key={m.id} className="matchup">
-                                      {renderSlot(m, m.p1Id, m.winnerId === m.p1Id, 'p1Id', col.roundIdx)}
-                                      {renderSlot(m, m.p2Id, m.winnerId === m.p2Id, 'p2Id', col.roundIdx)}
-                                  </div>
-                              ))}
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          );
-      }
-
-
-      // ------------------------------------ Tournament Logic ------------------------------------
-
-      function propagateWinners(bracket) {
-        const b = structuredClone(bracket);
-        for (let r = 0; r < b.rounds.length - 1; r++) {
-          const cur = b.rounds[r].matches;
-          const nxt = b.rounds[r + 1].matches;
-          for (let i = 0; i < nxt.length; i++) {
-            const a = cur[2 * i];
-            const c = cur[2 * i + 1];
-            nxt[i].p1Id = a ? (a.winnerId || null) : null;
-            nxt[i].p2Id = c ? (c.winnerId || null) : null;
-
-            if (nxt[i].winnerId && nxt[i].winnerId !== nxt[i].p1Id && nxt[i].winnerId !== nxt[i].p2Id) {
-              nxt[i].winnerId = null;
-              nxt[i].award = null;
-            }
-
-            if (!nxt[i].p1Id && !nxt[i].p2Id) {
-              nxt[i].winnerId = null;
-            }
-          }
-        }
-        return b;
-      }
-
-      function extractGoldStands(bracket) {
-        if (!bracket?.rounds || bracket.rounds.length < 2) return [];
-        const semi = bracket.rounds[bracket.rounds.length - 2];
-        const ids = semi.matches.flatMap((m) => [m.p1Id, m.p2Id]).filter(Boolean);
-        return Array.from(new Set(ids));
-      }
-
       function buildRegionalBracket(test, students, instrumentFilter, size) {
-          const pool = instrumentFilter
-            ? students.filter(s => s.instrument === instrumentFilter)
-            : students;
-
+          const pool = instrumentFilter ? students.filter(s => s.instrument === instrumentFilter) : students;
           const entries = Object.entries(test?.scores || {})
             .filter(([, sc]) => sc !== null && sc !== "" && Number(sc) >= 8.5)
-            .map(([studentId, sc]) => ({ studentId, score: Number(sc), instrument: students.find(s=>s.id===studentId)?.instrument }))
-            .filter(e => pool.some(s => s.id === e.studentId))
-            .sort((a, b) => b.score - a.score);
+            .map(([sid, sc]) => ({ sid, score: Number(sc), inst: students.find(s=>s.id===sid)?.instrument }))
+            .filter(e => pool.some(s => s.id === e.sid)).sort((a, b) => b.score - a.score);
 
           const instGroups = {};
-          entries.forEach(e => {
-              if (!instGroups[e.instrument]) instGroups[e.instrument] = [];
-              instGroups[e.instrument].push(e);
-          });
-
+          entries.forEach(e => { if(!instGroups[e.inst]) instGroups[e.inst]=[]; instGroups[e.inst].push(e); });
+          
           const regions = [[], [], [], []];
-          const keys = Object.keys(instGroups).sort((a,b) => instGroups[b].length - instGroups[a].length);
-
-          keys.forEach(k => {
+          Object.keys(instGroups).sort((a,b) => instGroups[b].length - instGroups[a].length).forEach(k => {
               instGroups[k].forEach(e => {
-                  let min = 999;
-                  let minIdx = 0;
-                  for(let i=0; i<4; i++) {
-                     if (regions[i].length < min) { min = regions[i].length; minIdx = i; }
-                  }
+                  let min = 999, minIdx = 0;
+                  for(let i=0; i<4; i++) if(regions[i].length < min) { min = regions[i].length; minIdx = i; }
                   regions[minIdx].push(e);
               });
           });
-
           regions.forEach(r => r.sort((a,b) => b.score - a.score));
 
-          const target = size / 4;
-          regions.forEach(r => {
-              while(r.length < target) r.push(null);
-          });
+          const target = size/4;
+          regions.forEach(r => { while(r.length < target) r.push(null); });
 
           function getPairs(reg) {
               const matches = [];
               const pairs = seededSlotOrder(target);
               for(let i=0; i<pairs.length; i+=2) {
-                  const p1 = reg[pairs[i]-1]?.studentId || null;
-                  const p2 = reg[pairs[i+1]-1]?.studentId || null;
-                  matches.push({ id: uid(), p1Id: p1, p2Id: p2, winnerId: null, award: null });
+                  matches.push({ id: uid(), p1Id: reg[pairs[i]-1]?.sid||null, p2Id: reg[pairs[i+1]-1]?.sid||null, winnerId: null });
               }
               return matches;
           }
 
-          const round1 = [ ...getPairs(regions[0]), ...getPairs(regions[1]), ...getPairs(regions[2]), ...getPairs(regions[3]) ];
-          const rounds = [{ name: roundLabel(size), matches: round1 }];
+          const round1 = [...getPairs(regions[0]), ...getPairs(regions[1]), ...getPairs(regions[2]), ...getPairs(regions[3])];
+          const rounds = [{ name: size===64?"Round of 64":`Round of ${size}`, matches: round1 }];
+          
+          let p = size/2;
+          while(p >= 2) {
+              rounds.push({ name: p===2?"Championship": p===4?"Final Four": p===8?"Elite Eight": `Round of ${p}`, matches: Array.from({length:p/2}, ()=>({id:uid(), p1Id:null, p2Id:null, winnerId:null})) });
+              p = p/2;
+          }
+          
+          const bracket = { size, rounds };
+          const seedsById = {}; entries.forEach((e,i) => seedsById[e.sid] = i+1);
+          return { bracket: propagateWinners(bracket), seedsById };
+      }
 
-          let participants = size / 2;
-          while (participants >= 2) {
-            if (participants === 1) break;
-            const matchCount = participants / 2;
-            const matches = Array.from({ length: matchCount }, () => ({
-              id: uid(), p1Id: null, p2Id: null, winnerId: null, award: null,
-            }));
-            rounds.push({ name: roundLabel(participants), matches });
-            participants = participants / 2;
+      function propagateWinners(bracket) {
+          const b = structuredClone(bracket);
+          for (let r = 0; r < b.rounds.length - 1; r++) {
+              const cur = b.rounds[r].matches;
+              const nxt = b.rounds[r + 1].matches;
+              for (let i = 0; i < nxt.length; i++) {
+                  const m1 = cur[2 * i];
+                  const m2 = cur[2 * i + 1];
+                  nxt[i].p1Id = m1 ? (m1.winnerId || null) : null;
+                  nxt[i].p2Id = m2 ? (m2.winnerId || null) : null;
+                  if (nxt[i].winnerId && nxt[i].winnerId !== nxt[i].p1Id && nxt[i].winnerId !== nxt[i].p2Id) {
+                      nxt[i].winnerId = null; // Reset if winner no longer exists in parents
+                  }
+                  if (!nxt[i].p1Id && !nxt[i].p2Id) nxt[i].winnerId = null;
+              }
+          }
+          return b;
+      }
+
+      function TournamentView({ tournament, students, isAdmin, onSetWinner, onSwapPlayer }) {
+          const { bracket, seedsById } = tournament;
+          const rounds = bracket.rounds;
+          const leftCols = [], rightCols = [];
+          const numRounds = rounds.length;
+          
+          for (let r = 0; r < numRounds - 1; r++) {
+              const matches = rounds[r].matches;
+              const half = matches.length / 2;
+              leftCols.push({ rIdx: r, label: rounds[r].name, matches: matches.slice(0, half) });
+              rightCols.push({ rIdx: r, label: rounds[r].name, matches: matches.slice(half) });
+          }
+          rightCols.reverse();
+          const finalMatch = rounds[numRounds - 1].matches[0];
+          const nameOf = (id) => students.find(s => s.id === id)?.name || "—";
+          const allP1 = new Set(); rounds[0].matches.forEach(m => { if(m.p1Id) allP1.add(m.p1Id); if(m.p2Id) allP1.add(m.p2Id); });
+          const avail = students.filter(s => !allP1.has(s.id)).sort((a,b) => a.name.localeCompare(b.name));
+
+          const Slot = ({ m, pid, isWin, slotKey, rIdx }) => {
+              const isActive = pid && !m.winnerId && isAdmin;
+              const isR1 = rIdx === 0;
+              return (
+                  <div className="slot-wrapper">
+                      <div className={`slot ${isActive ? 'interactable' : ''} ${isWin ? 'winner' : ''}`} onClick={() => isActive && onSetWinner(m.id, pid)}>
+                          {pid ? (
+                              <div className="player group flex justify-between items-center w-full">
+                                  <span className="truncate">{seedsById[pid] && <span className="text-gray-500 text-xs mr-1">#{seedsById[pid]}</span>}{nameOf(pid)}</span>
+                                  {isR1 && isAdmin && (
+                                      <select className="hidden group-hover:block w-4 h-4 opacity-0 absolute inset-0 cursor-pointer" 
+                                          onChange={(e) => { e.stopPropagation(); onSwapPlayer(m.id, slotKey, e.target.value); }}>
+                                          <option value="">Swap</option>
+                                          {avail.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                      </select>
+                                  )}
+                                  {isR1 && isAdmin && <span className="hidden group-hover:block text-blue-500 text-xs font-bold">Swap</span>}
+                              </div>
+                          ) : (
+                              isR1 && isAdmin ? 
+                              <select className="w-full h-full bg-transparent text-xs outline-none" onChange={e => onSwapPlayer(m.id, slotKey, e.target.value)} onClick={e=>e.stopPropagation()} value="">
+                                  <option value="" disabled hidden>+ Add</option>
+                                  {avail.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                              </select> : <span className="player text-gray-400 italic">TBD</span>
+                          )}
+                      </div>
+                  </div>
+              )
           }
 
-          const bracket = { size, rounds };
-          const finalBracket = propagateWinners(bracket);
-
-          const seedsById = {};
-          entries.forEach((e, idx) => seedsById[e.studentId] = idx + 1);
-
-          return { bracket: finalBracket, seedsById };
+          return (
+              <div className="bracket-wrapper">
+                  <div className="bracket-headers">{leftCols.map((c,i) => <div key={i} className="h-col">{c.label}</div>)}<div className="h-col center">Champ</div>{rightCols.map((c,i) => <div key={i} className="h-col">{c.label}</div>)}</div>
+                  <div className="bracket-body relative mt-6">
+                      <div className="region-watermark wm-nocap">No Cap</div><div className="region-watermark wm-aura">Aura</div><div className="region-watermark wm-vibe">Vibe</div><div className="region-watermark wm-goated">Goated</div>
+                      {leftCols.map((col, i) => <div key={i} className={`column left-side ${i===leftCols.length-1?'no-lines':''}`}>{col.matches.map(m => <div key={m.id} className="matchup"><Slot m={m} pid={m.p1Id} isWin={m.winnerId===m.p1Id} slotKey="p1Id" rIdx={col.rIdx}/><Slot m={m} pid={m.p2Id} isWin={m.winnerId===m.p2Id} slotKey="p2Id" rIdx={col.rIdx}/></div>)}</div>)}
+                      <div className="column center-col"><div className="center-area mt-16"><div className="championship-row"><Slot m={finalMatch} pid={finalMatch.p1Id} isWin={finalMatch.winnerId===finalMatch.p1Id} slotKey="p1Id" rIdx={numRounds-1}/><div className="vs-text">VS</div><Slot m={finalMatch} pid={finalMatch.p2Id} isWin={finalMatch.winnerId===finalMatch.p2Id} slotKey="p2Id" rIdx={numRounds-1}/></div><div className="champion-connector-horizontal"></div><div className="champion-connector-vertical"></div><div className="champion-slot-wrapper"><div className="slot">{tournament.championName || ""}</div><div className="champ-label">🏆 Champion 🏆</div></div></div></div>
+                      {rightCols.map((col, i) => <div key={i} className={`column right-side ${i===0?'no-lines':''}`}>{col.matches.map(m => <div key={m.id} className="matchup"><Slot m={m} pid={m.p1Id} isWin={m.winnerId===m.p1Id} slotKey="p1Id" rIdx={col.rIdx}/><Slot m={m} pid={m.p2Id} isWin={m.winnerId===m.p2Id} slotKey="p2Id" rIdx={col.rIdx}/></div>)}</div>)}
+                  </div>
+              </div>
+          );
       }
 
       function Tournaments({ state, setState, isAdmin }) {
-        const [selectedTestId, setSelectedTestId] = useState("");
-        const [selectedInstrument, setSelectedInstrument] = useState("");
-        const [size, setSize] = useState(64);
-        const [date, setDate] = useState(todayISO());
-        const [name, setName] = useState("Band Madness");
-        const [fullscreenTournamentId, setFullscreenTournamentId] = useState(null);
-        
-        const audioRef = useRef({});
+          const [conf, setConf] = useState({ testId: "", inst: "", size: 64, name: "Band Madness" });
+          const [fsId, setFsId] = useState(null);
 
-        useEffect(() => {
-          const make = (src) => {
-            const a = new Audio(src);
-            a.preload = "auto";
-            a.volume = clamp(Number(state.settings?.volume ?? 0.7), 0, 1);
-            return a;
-          };
-          audioRef.current = {
-            tournamentStart: make(SOUND_FILES.tournamentStart),
-            betweenRoundsA: make(SOUND_FILES.betweenRoundsA),
-            betweenRoundsB: make(SOUND_FILES.betweenRoundsB),
-            victory: make(SOUND_FILES.victory),
-            deepRun: make(SOUND_FILES.deepRun),
-          };
-        }, []);
-
-        function playSound(key) {
-          if (!state.settings?.soundEnabled) return;
-          const a = audioRef.current?.[key];
-          if (!a) return;
-          try { a.currentTime = 0; a.play(); } catch (_) {}
-        }
-
-        const tests = useMemo(() => {
-          return [...(state.chairTests || [])].filter(t => !t.isArchived).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-        }, [state.chairTests]);
-
-        useEffect(() => {
-          if (!selectedTestId && tests.length) setSelectedTestId(tests[0].id);
-        }, [tests]);
-
-        function createTournament() {
-          const test = (state.chairTests || []).find((t) => t.id === selectedTestId);
-          if (!test) {
-            alert("Select a Chair Test to seed from.");
-            return;
+          function create() {
+              const test = state.chairTests.find(t => t.id === conf.testId);
+              if (!test) return alert("Select Seed Test");
+              const { bracket, seedsById } = buildRegionalBracket(test, state.students, conf.inst || "", conf.size);
+              const t = { id: uid(), date: todayISO(), name: conf.name, testId: test.id, instrument: conf.inst||"All", size: conf.size, seedsById, bracket, championId: null, championName: null, isArchived: false };
+              setState(prev => ({ ...prev, tournaments: [t, ...prev.tournaments] }));
           }
-          
-          const { bracket, seedsById } = buildRegionalBracket(test, state.students, selectedInstrument, size);
 
-          const t = {
-            id: uid(),
-            date,
-            name: name?.trim() || "Band Madness",
-            testId: test.id,
-            instrument: selectedInstrument || "All",
-            size: clamp(Number(size || 64), 8, 64),
-            seedsById,
-            bracket,
-            championId: null,
-            championName: null, 
-            goldStands: extractGoldStands(bracket),
-            isArchived: false
-          };
+          function setWinner(tid, mid, wid) {
+              setState(prev => {
+                  const t = prev.tournaments.find(x => x.id === tid);
+                  const b = structuredClone(t.bracket);
+                  let match, rIdx;
+                  for(let r=0; r<b.rounds.length; r++) { match = b.rounds[r].matches.find(m => m.id === mid); if(match) { rIdx=r; break; }}
+                  if(!match || match.winnerId === wid) return prev;
+                  
+                  const lid = match.p1Id === wid ? match.p2Id : match.p1Id;
+                  const roundsLeft = b.rounds.length - 1 - rIdx; // 0 = Finals
+                  
+                  let reward = 10; // Base
+                  // Deep Run Bonuses
+                  if (roundsLeft === 2) reward += 8; // Elite 8
+                  if (roundsLeft === 1) reward += 40; // Final 4 (Standard 10 + 40)
+                  if (roundsLeft === 0) reward += 50; // Won Semis, entering Finals
+                  
+                  // Seed Upset Bonus
+                  const wSeed = t.seedsById[wid], lSeed = t.seedsById[lid];
+                  if (wSeed && lSeed && wSeed > lSeed) reward += (wSeed - lSeed) * 2;
 
-          setState((prev) => ({ ...prev, tournaments: [t, ...(prev.tournaments || [])] }));
-          playSound("tournamentStart");
-        }
+                  const students = prev.students.map(s => s.id === wid ? { ...s, bandBucks: (s.bandBucks || 0) + reward } : s);
+                  
+                  match.winnerId = wid;
+                  const newB = propagateWinners(b);
+                  const champId = newB.rounds[newB.rounds.length-1].matches[0].winnerId;
+                  
+                  if (champId && champId !== t.championId) {
+                      students.find(s => s.id === champId).bandBucks += 100;
+                  }
 
-        function archiveTournament(tournamentId) {
-            if(!confirm("Send to Archives? You can restore it later.")) return;
-            setState(prev => ({
-                ...prev,
-                tournaments: prev.tournaments.map(t => t.id === tournamentId ? { ...t, isArchived: true } : t)
-            }));
-        }
+                  return {
+                      ...prev,
+                      students,
+                      tournaments: prev.tournaments.map(x => x.id === tid ? { ...t, bracket: newB, championId: champId, championName: champId ? prev.students.find(s=>s.id===champId).name : null } : x)
+                  };
+              });
+          }
 
-        function deleteTournament(tournamentId) {
-            if(!confirm("Permanently delete this bracket? This cannot be undone.")) return;
-            setState(prev => ({
-                ...prev,
-                tournaments: prev.tournaments.filter(t => t.id !== tournamentId)
-            }));
-        }
+          function swapPlayer(tid, mid, slotKey, newPid) {
+              setState(prev => {
+                  const t = prev.tournaments.find(x => x.id === tid);
+                  const b = structuredClone(t.bracket);
+                  const match = b.rounds[0].matches.find(m => m.id === mid);
+                  if(!match) return prev;
+                  
+                  const oldWinner = match.winnerId;
+                  const oldPid = match[slotKey];
+                  
+                  match[slotKey] = newPid;
+                  // Auto-propagate if the old player was the winner
+                  if (oldWinner && oldWinner === oldPid) {
+                      match.winnerId = newPid;
+                  } else if (match.winnerId && match.winnerId !== match.p1Id && match.winnerId !== match.p2Id) {
+                      match.winnerId = null; // Reset if invalid
+                  }
 
-        function reseedTournament(tournamentId) {
-            if (!confirm("Are you sure you want to reseed? This will completely wipe this bracket's progress and re-pull the 8.5+ scores from the Chair Test.")) return;
-            setState((prev) => {
-                const t = prev.tournaments.find((x) => x.id === tournamentId);
-                const test = prev.chairTests.find((x) => x.id === t.testId);
-                if (!test) return prev;
-                const { bracket, seedsById } = buildRegionalBracket(test, prev.students, t.instrument === "All" ? "" : t.instrument, t.size);
-                return {
-                    ...prev,
-                    tournaments: prev.tournaments.map((x) => 
-                        x.id === tournamentId ? { ...x, bracket, seedsById, championId: null, championName: null, goldStands: [] } : x
-                    )
-                };
-            });
-        }
+                  const newB = propagateWinners(b);
+                  const champId = newB.rounds[newB.rounds.length-1].matches[0].winnerId;
+                  
+                  return {
+                      ...prev,
+                      tournaments: prev.tournaments.map(x => x.id === tid ? { ...t, bracket: newB, championId: champId, championName: champId ? prev.students.find(s=>s.id===champId).name : null } : x)
+                  };
+              });
+          }
 
-        function updateMatchPlayer(tournamentId, matchId, slotKey, newPlayerId) {
-            setState((prev) => {
-                const t = prev.tournaments.find((x) => x.id === tournamentId);
-                if (!t) return prev;
-                const b = structuredClone(t.bracket);
-                const match = b.rounds[0].matches.find((m) => m.id === matchId);
-                
-                if (match) {
-                    const oldPlayerId = match[slotKey];
-                    match[slotKey] = newPlayerId || null;
+          const active = state.tournaments.filter(t => !t.isArchived);
+          return (
+              <div className="space-y-6">
+                  {isAdmin && <Card title="New Tournament"><div className="grid grid-cols-5 gap-2"><Select value={conf.testId} onChange={e=>setConf({...conf, testId:e.target.value})}><option value="">Select Test...</option>{state.chairTests.filter(t=>!t.isArchived).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</Select><Select value={conf.inst} onChange={e=>setConf({...conf, inst:e.target.value})}><option value="">All Instruments</option>{INSTRUMENTS.map(i=><option key={i} value={i}>{i}</option>)}</Select><Select value={conf.size} onChange={e=>setConf({...conf, size:Number(e.target.value)})}>{TOURNAMENT_SIZES.map(s=><option key={s} value={s}>{s}</option>)}</Select><Input value={conf.name} onChange={e=>setConf({...conf, name:e.target.value})}/><Button onClick={create} className="bg-blue-600 text-white font-bold">Launch</Button></div></Card>}
+                  {active.map(t => (
+                      <div key={t.id} className={fsId === t.id ? "fullscreen-overlay" : "bg-white border shadow-sm rounded-2xl overflow-hidden"}>
+                           <div className="w-full bg-gradient-to-br from-[#002147] to-[#001530] text-white p-4 flex items-center justify-center gap-4 border-b-4 border-blue-400 relative">
+                              <LogoSVG />
+                              <div className="text-center"><h1 className="text-3xl italic font-black uppercase tracking-wider text-shadow-md">{t.name}</h1><p className="text-blue-300 font-bold uppercase">{t.instrument === "All" ? "Barking Battalion" : t.instrument}</p></div>
+                              <div className="absolute right-4 top-4 flex gap-2">
+                                  <Button onClick={() => setFsId(fsId ? null : t.id)} className="bg-purple-600 text-white font-bold">📺 {fsId ? "Exit" : "Full Screen"}</Button>
+                                  {isAdmin && <Button onClick={() => setState(p => ({...p, tournaments: p.tournaments.map(x=>x.id===t.id?{...x, isArchived:true}:x)}))} className="bg-red-600 text-white">Archive</Button>}
+                              </div>
+                           </div>
+                           <div className="bracket-scroll-container">
+                               <TournamentView tournament={t} students={state.students} isAdmin={isAdmin} onSetWinner={(m,w) => setWinner(t.id, m, w)} onSwapPlayer={(m,k,p) => swapPlayer(t.id, m, k, p)} />
+                           </div>
+                      </div>
+                  ))}
+              </div>
+          )
+      }
 
-                    // If replacing an existing player, cascade the change to future rounds
-                    if (oldPlayerId && newPlayerId) {
-                        for (let r = 0; r < b.rounds.length; r++) {
-                            b.rounds[r].matches.forEach(m => {
-                                if (m.p1Id === oldPlayerId) m.p1Id = newPlayerId;
-                                if (m.p2Id === oldPlayerId) m.p2Id = newPlayerId;
-                                if (m.winnerId === oldPlayerId) {
-                                    m.winnerId = newPlayerId;
-                                    if (m.award && m.award.winnerId === oldPlayerId) m.award.winnerId = newPlayerId;
-                                }
-                            });
-                        }
-                        // Swap seeds
-                        t.seedsById[newPlayerId] = t.seedsById[oldPlayerId];
-                        delete t.seedsById[oldPlayerId];
-                    } 
-                    // Handle complete removal of player
-                    else if (oldPlayerId && !newPlayerId) {
-                         for (let r = 0; r < b.rounds.length; r++) {
-                            b.rounds[r].matches.forEach(m => {
-                                if (m.p1Id === oldPlayerId) m.p1Id = null;
-                                if (m.p2Id === oldPlayerId) m.p2Id = null;
-                                if (m.winnerId === oldPlayerId) m.winnerId = null;
-                            });
-                        }
-                    }
-                }
-                
-                const newB = propagateWinners(b);
-                
-                // Also update Champion if it was the old player
-                let newChampId = t.championId;
-                const finalMatch = newB.rounds[newB.rounds.length - 1].matches[0];
-                if (finalMatch.winnerId) newChampId = finalMatch.winnerId;
-                else newChampId = null;
-
-                const newChampName = newChampId ? prev.students.find(s => s.id === newChampId)?.name : null;
-
-                const updatedTournament = { ...t, bracket: newB, goldStands: extractGoldStands(newB), championId: newChampId, championName: newChampName };
-                return {
-                    ...prev,
-                    tournaments: prev.tournaments.map((x) => x.id === tournamentId ? updatedTournament : x)
-                };
-            });
-        }
-
-        function awardForMatch(tournament, bracket, roundIndex, winnerId, loserId) {
-            let bonus = 0;
-
-            // Upset bonus
-            const wSeed = tournament.seedsById?.[winnerId] ?? null;
-            const lSeed = tournament.seedsById?.[loserId] ?? null;
-            if (wSeed && lSeed && wSeed > lSeed) {
-               bonus += (wSeed - lSeed) * 2; // Default underdog logic
-            }
-
-            // Progression logic
-            const numRounds = bracket.rounds.length;
-            const isFinalRound = roundIndex === numRounds - 1;
-            const nextRound = bracket.rounds[roundIndex + 1];
-
-            // Base for ANY win is 10
-            let base = 10;
-
-            if (isFinalRound) {
-                // Champion! (+100)
-                base += 100;
-            } else if (nextRound) {
-                if (nextRound.name === "Elite Eight") base += 8;
-                if (nextRound.name === "The Final Four") base += 40;
-                if (nextRound.name === "Championship Round") base += 50;
-            }
-
-            return base + bonus;
-        }
-
-        function roundIsComplete(bracket, roundIndex) {
-          const round = bracket?.rounds?.[roundIndex];
-          if (!round) return false;
-          return round.matches.every((m) => {
-            if (!m.p1Id && !m.p2Id) return true;
-            if (m.p1Id && !m.p2Id) return !!m.winnerId; 
-            if (!m.p1Id && m.p2Id) return !!m.winnerId; 
-            return !!m.winnerId;
-          });
-        }
-
-        function setWinner(tournamentId, matchId, winnerId) {
-          setState((prev) => {
-            const t = (prev.tournaments || []).find((x) => x.id === tournamentId);
-            if (!t) return prev;
-
-            const before = t.bracket;
-            const b = structuredClone(before);
-
-            let roundIndex = -1;
-            let match = null;
-
-            for (let r = 0; r < b.rounds.length; r++) {
-              const round = b.rounds[r];
-              const found = round.matches.find((m) => m.id === matchId);
-              if (found) {
-                roundIndex = r;
-                match = found;
-                break;
+      function HallOfChampions({ state }) {
+          const champs = {};
+          let currentChamp = null; let maxDate = "";
+          state.tournaments.forEach(t => {
+              if (t.championName) {
+                  if (!champs[t.championName]) champs[t.championName] = { name: t.championName, wins: 0, titles: [] };
+                  champs[t.championName].wins++;
+                  champs[t.championName].titles.push(`${t.name} (${t.date})`);
+                  if (!t.isArchived && t.date >= maxDate) { maxDate = t.date; currentChamp = t.championName; }
               }
-            }
-            if (!match) return prev;
-            if (match.winnerId === winnerId) return prev; 
+          });
+          const sorted = Object.values(champs).sort((a,b) => b.wins - a.wins);
 
-            const oldWinner = match.winnerId || null;
-            const oldAward = (match.award && match.award.winnerId === oldWinner) ? Number(match.award.amount || 0) : 0;
+          return (
+              <div className="space-y-8">
+                  {currentChamp && (
+                      <div className="relative overflow-hidden w-full bg-[#002147] text-white p-12 rounded-3xl shadow-2xl border-4 border-yellow-400 text-center flex flex-col items-center justify-center">
+                          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDQwTDQwIDBIMjBMMCAyMCIgZmlsbD0iIzAwMzM2NiIgZmlsbC1vcGFjaXR5PSIwLjEiLz48cGF0aCBkPSJNMCA0MEw0MCAwSDBMMCA0MCIgZmlsbD0iIzAwMzM2NiIgZmlsbC1vcGFjaXR5PSIwLjEiLz48L2c+PC9zdmc+')] opacity-20"></div>
+                          <div className="text-yellow-400 font-black uppercase tracking-[0.3em] text-lg mb-2 z-10">Reigning Defending Undisputed</div>
+                          <h1 className="text-7xl md:text-9xl font-black italic uppercase champ-glow z-10 drop-shadow-lg">{currentChamp}</h1>
+                          <div className="mt-6 text-2xl font-bold text-blue-200 z-10">🏆 Heavyweight Champion of the Band 🏆</div>
+                      </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {sorted.map((c, i) => (
+                          <div key={c.name} className="bg-white border-2 border-[#002147] rounded-xl overflow-hidden shadow-lg transform hover:-translate-y-1 transition">
+                              <div className="bg-[#002147] text-white p-4 text-center relative">
+                                  {i===0 && <span className="absolute top-0 right-0 bg-yellow-400 text-[#002147] font-black text-xs px-2 py-1">GOAT</span>}
+                                  <h3 className="text-2xl font-black uppercase">{c.name}</h3>
+                              </div>
+                              <div className="p-6 text-center">
+                                  <div className="text-5xl font-black text-gray-800 mb-2">{c.wins}</div>
+                                  <div className="text-xs uppercase font-bold text-gray-400 tracking-widest mb-4">Titles</div>
+                                  <ul className="text-left text-sm space-y-2 bg-gray-50 p-3 rounded">{c.titles.map((t, idx) => <li key={idx} className="border-b last:border-0 pb-1 font-semibold text-[#002147]">{t}</li>)}</ul>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )
+      }
 
-            let students = prev.students || [];
-            if (oldWinner && oldAward > 0) {
-              students = students.map((s) => (s.id === old
+      function App() {
+          const [state, setState] = usePersistentState();
+          const [isAdmin, setIsAdmin] = useState(false);
+          const [tab, setTab] = useState("Live Brackets");
+
+          const tabs = isAdmin 
+            ? ["Students", "Chair Tests", "Tournaments", "Live Brackets"] 
+            : ["Live Brackets", "Hall of Champions", "Public Chairs"];
+
+          return (
+              <div className="min-h-screen text-gray-900 max-w-7xl mx-auto px-4 py-6 space-y-4">
+                  <div className="flex justify-between items-center border-b pb-4">
+                      <h1 className="text-3xl font-black text-[#002147]">Barking Battalion <span className="text-blue-500 font-light">| Tracker</span></h1>
+                      <Button onClick={() => setIsAdmin(!isAdmin)} className={isAdmin?"bg-red-50 text-red-600":"bg-blue-50 text-blue-600"}>{isAdmin ? "Logout Admin" : "Admin Login"}</Button>
+                  </div>
+                  <div className="flex gap-2">{tabs.map(t => <Button key={t} onClick={() => setTab(t)} className={tab===t ? "bg-blue-600 text-white font-bold" : "text-gray-600"}>{t}</Button>)}</div>
+                  
+                  {tab === "Students" && <StudentsManager state={state} setState={setState} />}
+                  {tab === "Chair Tests" && <ChairTests state={state} setState={setState} />}
+                  {tab === "Tournaments" && <Tournaments state={state} setState={setState} isAdmin={true} />}
+                  {tab === "Live Brackets" && <Tournaments state={state} setState={setState} isAdmin={isAdmin} />}
+                  {tab === "Hall of Champions" && <HallOfChampions state={state} />}
+                  {tab === "Public Chairs" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {INSTRUMENTS.map(i => {
+                             const list = state.chairOrders[i] || [];
+                             if(!list.length) return null;
+                             return (
+                                 <div key={i} className="bg-white border-2 border-[#002147] rounded-xl overflow-hidden shadow">
+                                     <div className="bg-[#002147] text-white p-3 text-center font-black uppercase text-xl">{i}</div>
+                                     {list.map((sid, idx) => {
+                                         const s = state.students.find(x=>x.id===sid);
+                                         return <div key={sid} className={`p-3 flex items-center border-b ${idx===0?'bg-yellow-50 font-bold':''}`}><span className="w-8 text-gray-400 font-bold">#{idx+1}</span>{s?.name}</div>
+                                     })}
+                                 </div>
+                             )
+                        })}
+                    </div>
+                  )}
+              </div>
+          );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>
