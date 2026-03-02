@@ -374,7 +374,7 @@
         { id: 'chill', name: "Free Day (Xbox or Uno)", cost: 400, note: "Relaxation time" },
         { id: 'swap', name: "Swap Instrument for the Day", cost: 190, note: "Must be approved" },
         { id: 'boost', name: "Boost a Friend (Chair Test)", cost: 300, note: "Give a bonus to someone else" },
-        { id: 'party', name: "Pizza, Chips, & Soda Party", cost: 1000, note: "Must notify Mr. A in advance" },
+        { id: 'party', name: "Pizza, Chips, & Soda Party", cost: 2500, note: "Bring your own food/snacks, notify Mr. A in advance" },
       ];
 
       const SOUND_FILES = {
@@ -383,6 +383,7 @@
         betweenRoundsB: "espntheme.mp3",
         victory: "nfl-draft-chime.mp3",
         deepRun: "he-could-go-all-the.mp3",
+        applause: "applause.mp3"
       };
 
       const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -563,6 +564,7 @@
             betweenRoundsB: make(SOUND_FILES.betweenRoundsB),
             victory: make(SOUND_FILES.victory),
             deepRun: make(SOUND_FILES.deepRun),
+            applause: make(SOUND_FILES.applause)
           };
         }, []);
 
@@ -572,7 +574,15 @@
           if (!a) return;
           try { a.pause(); a.currentTime = 0; a.volume = clamp(Number(settings?.volume ?? 0.7), 0, 1); a.play(); } catch (_) {}
         }
-        return { play };
+        
+        function stopAll() {
+            if (!audioRef.current) return;
+            Object.values(audioRef.current).forEach(a => {
+                if (a) { a.pause(); a.currentTime = 0; }
+            });
+        }
+        
+        return { play, stopAll };
       }
 
       // ------------------------------------ Students ------------------------------------
@@ -1103,6 +1113,7 @@
       function seededSlotOrder(size) {
         const slots = []; for (let i = 1; i <= size / 2; i++) { slots.push(i); slots.push(size - i + 1); } return slots; 
       }
+      
       function propagateWinners(bracket) {
         const b = structuredClone(bracket);
         for (let r = 0; r < b.rounds.length - 1; r++) {
@@ -1112,8 +1123,14 @@
             const a = cur[2 * i];
             const c = cur[2 * i + 1];
             
-            nxt[i].p1Id = a ? (a.winnerId || null) : null;
-            nxt[i].p2Id = c ? (c.winnerId || null) : null;
+            if (a) {
+                if (a.winnerId) nxt[i].p1Id = a.winnerId;
+                else if (!a.winnerId && (nxt[i].p1Id === a.p1Id || nxt[i].p1Id === a.p2Id)) nxt[i].p1Id = null;
+            }
+            if (c) {
+                if (c.winnerId) nxt[i].p2Id = c.winnerId;
+                else if (!c.winnerId && (nxt[i].p2Id === c.p1Id || nxt[i].p2Id === c.p2Id)) nxt[i].p2Id = null;
+            }
 
             if (nxt[i].winnerId && nxt[i].winnerId !== nxt[i].p1Id && nxt[i].winnerId !== nxt[i].p2Id) {
               nxt[i].winnerId = null;
@@ -1159,7 +1176,7 @@
         rightCols.reverse();
         const finalMatch = rounds[rounds.length - 1].matches[0];
 
-        const canEditSlot = (roundIdx) => !readOnly && roundIdx === 0;
+        const canEditSlot = (roundIdx) => !readOnly;
 
         const renderSlot = (match, playerId, isWinner, slotKey, roundIdx) => {
             const isActive = playerId && !match.winnerId && !readOnly;
@@ -1216,7 +1233,9 @@
         const [selectedTestId, setSelectedTestId] = useState("");
         const [size, setSize] = useState(64);
         const [name, setName] = useState("Band Madness");
-        const { play: playSound } = useAudioBank(state.settings);
+        const [fullscreenTournamentId, setFullscreenTournamentId] = useState(null);
+        
+        const { play: playSound, stopAll } = useAudioBank(state.settings);
         const tests = (state.chairTests || []).filter(t => !t.isArchived);
 
         function createTournament() {
@@ -1232,7 +1251,13 @@
                 const t = prev.tournaments.find(x => x.id === tournamentId);
                 if (!t) return prev;
                 const b = structuredClone(t.bracket);
-                const match = b.rounds[0].matches.find(m => m.id === matchId);
+                
+                // Find the match wherever it lives
+                let match = null;
+                for (let r = 0; r < b.rounds.length; r++) {
+                    const m = b.rounds[r].matches.find(x => x.id === matchId);
+                    if (m) { match = m; break; }
+                }
                 
                 if (match) {
                     const oldPlayerId = match[slotKey];
@@ -1242,7 +1267,7 @@
                         match.winnerId = newPlayerId; 
                     } else if (match.winnerId && match.winnerId !== match.p1Id && match.winnerId !== match.p2Id) {
                         match.winnerId = null;
-                        match.award = null; // Also clear award ledger for integrity
+                        match.award = null; 
                     }
                 }
                 
@@ -1350,23 +1375,44 @@
                         </div>
                     </Card>
                 )}
-                {state.tournaments.filter(t => !t.isArchived).map(t => (
-                    <div key={t.id} className="mt-8 bg-white border shadow-sm rounded-2xl overflow-hidden">
-                        <div className="w-full bg-gradient-to-br from-[#002147] to-[#001530] text-white p-4 flex items-center justify-center gap-4 border-b-4 border-blue-400">
-                             <LogoSVG />
-                             <div className="text-center">
-                                 <h1 className="text-3xl italic font-black uppercase tracking-wider text-shadow-md">{t.name}</h1>
-                             </div>
+                {state.tournaments.filter(t => !t.isArchived).map(t => {
+                    const isFullscreen = fullscreenTournamentId === t.id;
+                    return (
+                        <div key={t.id} className={isFullscreen ? "fullscreen-overlay" : "mt-8 bg-white border shadow-sm rounded-2xl overflow-hidden"}>
+                            <div className="w-full bg-gradient-to-br from-[#002147] to-[#001530] text-white p-4 flex items-center justify-center gap-4 border-b-4 border-blue-400">
+                                 <LogoSVG />
+                                 <div className="text-center">
+                                     <h1 className="text-3xl italic font-black uppercase tracking-wider text-shadow-md">{t.name}</h1>
+                                 </div>
+                            </div>
+                            <div className="bg-white p-4 border-b flex justify-between no-print">
+                                 <div className="text-sm font-semibold">{t.date} • {t.size}-Seed</div>
+                                 <div className="flex gap-2">
+                                     <Button onClick={() => setFullscreenTournamentId(isFullscreen ? null : t.id)} className="font-bold border-purple-600 text-purple-700 bg-purple-50">
+                                         {isFullscreen ? "↙️ Exit Full Screen" : "📺 Full Screen"}
+                                     </Button>
+                                     {isAdmin && <Button onClick={() => setState(prev => ({ ...prev, tournaments: prev.tournaments.map(tt => tt.id === t.id ? { ...tt, isArchived: true } : tt) }))} className="font-bold border-yellow-600 text-yellow-700 bg-yellow-50">📁 Archive</Button>}
+                                     {isAdmin && <Button onClick={() => { if(confirm("Permanently delete this tournament?")) setState(prev => ({ ...prev, tournaments: prev.tournaments.filter(tt => tt.id !== t.id) })) }} className="font-bold border-red-600 text-red-700 bg-red-50">🗑️ Delete</Button>}
+                                 </div>
+                            </div>
+                            <div className="bracket-scroll-container">
+                                <BracketView tournament={t} students={state.students} readOnly={!isAdmin} onSetWinner={(mId, wId) => setWinner(t.id, mId, wId)} onUpdatePlayer={(mId, slot, pId) => updateMatchPlayer(t.id, mId, slot, pId)} />
+                            </div>
+                            {isAdmin && (
+                                <div className="flex flex-wrap justify-center items-center gap-3 p-4 bg-gray-50 border-t border-gray-200 no-print">
+                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mr-2">Soundboard</span>
+                                    <Button onClick={() => playSound("tournamentStart")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 Start</Button>
+                                    <Button onClick={() => playSound("betweenRoundsA")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 NBA</Button>
+                                    <Button onClick={() => playSound("betweenRoundsB")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 ESPN</Button>
+                                    <Button onClick={() => playSound("deepRun")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 Deep Run</Button>
+                                    <Button onClick={() => playSound("victory")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">🔊 Victory</Button>
+                                    <Button onClick={() => playSound("applause")} className="text-xs bg-white border-gray-300 shadow-sm hover:bg-gray-100">👏 Applause</Button>
+                                    <Button onClick={stopAll} className="text-xs bg-red-100 text-red-700 border-red-200 font-bold hover:bg-red-200">⏹️ Stop Audio</Button>
+                                </div>
+                            )}
                         </div>
-                        <div className="bg-white p-4 border-b flex justify-between no-print">
-                             <div className="text-sm font-semibold">{t.date} • {t.size}-Seed</div>
-                             {isAdmin && <Button onClick={() => setState(prev => ({ ...prev, tournaments: prev.tournaments.map(tt => tt.id === t.id ? { ...tt, isArchived: true } : tt) }))} className="text-red-600 border-red-200">Archive</Button>}
-                        </div>
-                        <div className="bracket-scroll-container">
-                            <BracketView tournament={t} students={state.students} readOnly={!isAdmin} onSetWinner={(mId, wId) => setWinner(t.id, mId, wId)} onUpdatePlayer={(mId, slot, pId) => updateMatchPlayer(t.id, mId, slot, pId)} />
-                        </div>
-                    </div>
-                ))}
+                    )
+                })}
             </div>
         );
       }
