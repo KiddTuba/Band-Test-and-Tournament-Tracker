@@ -41,11 +41,15 @@
         if(!window.React) throw new Error('React failed to load from the CDN.');
         if(!window.ReactDOM) throw new Error('ReactDOM failed to load from the CDN.');
         if(!window.Babel) throw new Error('Babel failed to load from the CDN.');
-        const response=await fetch('./bandcenter-app.js?v=2',{cache:'no-store'});
+        const response=await fetch('./bandcenter-app.js?v=3',{cache:'no-store'});
         if(!response.ok) throw new Error('Could not load bandcenter-app.js (HTTP '+response.status+').');
         const source=await response.text();
         if(!source.trim()) throw new Error('bandcenter-app.js loaded but was empty.');
-        const compiled=Babel.transform(source,{presets:['react'],sourceType:'script'}).code;
+        const compiled=Babel.transform(source,{
+          plugins:[["transform-react-jsx",{runtime:"classic"}]],
+          sourceType:'script'
+        }).code;
+        if(/\brequire\s*\(/.test(compiled)) throw new Error('Browser build unexpectedly contains CommonJS require().');
         (0,eval)(compiled);
       }catch(err){
         console.error('BandCenter boot failed',err);
