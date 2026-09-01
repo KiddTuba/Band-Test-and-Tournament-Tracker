@@ -9,14 +9,49 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="bandcenter.css" />
+  <style>
+    #boot-status{font-family:Inter,system-ui,sans-serif;max-width:760px;margin:72px auto;padding:28px;border-radius:18px;background:#06172e;color:#fff;box-shadow:0 18px 55px rgba(0,0,0,.18)}
+    #boot-status h1{margin:0 0 8px;font-size:32px}#boot-status p{margin:7px 0;color:#c9d8ec;line-height:1.55}
+    #boot-status.error{background:#4b0d16}#boot-status code{display:block;white-space:pre-wrap;background:rgba(255,255,255,.1);padding:12px;border-radius:10px;margin-top:14px;color:#fff}
+  </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <div id="root">
+    <div id="boot-status"><h1>BandCenter</h1><p>Loading the Beginning Band Championship Series…</p></div>
+  </div>
+
+  <script>
+    function showBootError(message){
+      var root=document.getElementById('root');
+      root.innerHTML='<div id="boot-status" class="error"><h1>BandCenter startup error</h1><p>The app could not finish loading. Copy the message below and send it to Mr. A / Lyra.</p><code></code></div>';
+      root.querySelector('code').textContent=String(message||'Unknown startup error');
+    }
+    window.addEventListener('error',function(e){showBootError(e.error&&e.error.stack?e.error.stack:(e.message||'Browser script error'));});
+    window.addEventListener('unhandledrejection',function(e){showBootError(e.reason&&e.reason.stack?e.reason.stack:e.reason);});
+  </script>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
   <script src="bandcenter-config.js"></script>
-  <script type="text/babel" data-presets="react" src="bandcenter-app.js"></script>
+  <script>
+    (async function bootBandCenter(){
+      try{
+        if(!window.React) throw new Error('React failed to load from the CDN.');
+        if(!window.ReactDOM) throw new Error('ReactDOM failed to load from the CDN.');
+        if(!window.Babel) throw new Error('Babel failed to load from the CDN.');
+        const response=await fetch('./bandcenter-app.js?v=2',{cache:'no-store'});
+        if(!response.ok) throw new Error('Could not load bandcenter-app.js (HTTP '+response.status+').');
+        const source=await response.text();
+        if(!source.trim()) throw new Error('bandcenter-app.js loaded but was empty.');
+        const compiled=Babel.transform(source,{presets:['react'],sourceType:'script'}).code;
+        (0,eval)(compiled);
+      }catch(err){
+        console.error('BandCenter boot failed',err);
+        showBootError(err&&err.stack?err.stack:err);
+      }
+    })();
+  </script>
 </body>
 </html>
