@@ -23,26 +23,26 @@ function BandStore({state,setState}){
   function flash(msg){setMessage(msg);setTimeout(()=>setMessage(""),3200)}
   function buy(item){
     if(!student)return alert("Choose a student first.");
-    if(balance<item.cost)return alert(`${student.name} needs ${item.cost-balance} more Band Bucks for ${item.name}.`);
-    if(!confirm(`Purchase ${item.name} for ${student.name} for ${item.cost} Band Bucks?\n\nCurrent balance: ${balance}\nNew balance: ${balance-item.cost}`))return;
+    if(balance<item.cost)return alert(\`\${student.name} needs \${item.cost-balance} more Band Bucks for \${item.name}.\`);
+    if(!confirm(\`Purchase \${item.name} for \${student.name} for \${item.cost} Band Bucks?\n\nCurrent balance: \${balance}\nNew balance: \${balance-item.cost}\`))return;
     const tx={id:uid(),studentId:student.id,studentName:student.name,ensemble:student.ensemble,itemId:item.id,itemName:item.name,cost:item.cost,purchasedAt:new Date().toISOString(),refundedAt:null};
     setState(q=>({...q,students:q.students.map(s=>s.id===student.id?{...s,bandBucks:Math.max(0,Number(s.bandBucks||0)-item.cost)}:s),storeTransactions:[...(q.storeTransactions||[]),tx],meta:{...q.meta,lastStorePurchase:tx}}));
-    flash(`${student.name} purchased ${item.name} for ${item.cost} Band Bucks.`);
+    flash(\`\${student.name} purchased \${item.name} for \${item.cost} Band Bucks.\`);
   }
   function refund(tx){
     if(tx.refundedAt)return;
-    if(!confirm(`Refund ${tx.itemName} to ${student?.name||tx.studentName} and return ${tx.cost} Band Bucks?`))return;
+    if(!confirm(\`Refund \${tx.itemName} to \${student?.name||tx.studentName} and return \${tx.cost} Band Bucks?\`))return;
     const refundedAt=new Date().toISOString();
     setState(q=>({...q,students:q.students.map(s=>s.id===tx.studentId?{...s,bandBucks:Number(s.bandBucks||0)+Number(tx.cost||0)}:s),storeTransactions:(q.storeTransactions||[]).map(x=>x.id===tx.id?{...x,refundedAt}:x),meta:{...q.meta,lastStoreRefund:{transactionId:tx.id,refundedAt}}}));
-    flash(`Refunded ${tx.itemName}. ${tx.cost} Band Bucks returned.`);
+    flash(\`Refunded \${tx.itemName}. \${tx.cost} Band Bucks returned.\`);
   }
   return <div className="band-store-shell">
     <div className="card store-hero"><div className="card-head"><div><div className="card-title">BandCenter Band Store</div><div className="realname">Commissioner checkout • purchases deduct Band Bucks immediately</div></div></div>
       <div className="card-body store-checkout-row"><div><label>Student</label><Select value={selectedId} onChange={e=>setSelectedId(e.target.value)}><option value="">Choose a student</option>{players.map(s=><option value={s.id} key={s.id}>{s.name} • {s.moniker} • {Number(s.bandBucks||0)} BB</option>)}</Select></div><div className="store-balance"><span>Available Balance</span><b>{student?balance:0}</b><small>BAND BUCKS</small></div></div>
       {message&&<div className="store-message">{message}</div>}
     </div>
-    <div className="store-grid">{STORE_ITEMS.map(item=>{const canBuy=!!student&&balance>=item.cost;return <div className={`store-item ${canBuy?"affordable":"locked"}`} key={item.id}><div className="store-price">{item.cost} BB</div><h3>{item.name}</h3><p>{item.note}</p><Button className={canBuy?"gold":""} disabled={!student||!canBuy} onClick={()=>buy(item)}>{!student?"Choose Student":canBuy?"Purchase":`Need ${item.cost-balance} More`}</Button></div>})}</div>
-    <div className="card store-history"><div className="card-head"><div><div className="card-title">Purchase History</div><div className="realname">{student?`Transactions for ${student.name}`:"Choose a student to view transactions"}</div></div></div>
+    <div className="store-grid">{STORE_ITEMS.map(item=>{const canBuy=!!student&&balance>=item.cost;return <div className={\`store-item \${canBuy?"affordable":"locked"}\`} key={item.id}><div className="store-price">{item.cost} BB</div><h3>{item.name}</h3><p>{item.note}</p><Button className={canBuy?"gold":""} disabled={!student||!canBuy} onClick={()=>buy(item)}>{!student?"Choose Student":canBuy?"Purchase":\`Need \${item.cost-balance} More\`}</Button></div>})}</div>
+    <div className="card store-history"><div className="card-head"><div><div className="card-title">Purchase History</div><div className="realname">{student?\`Transactions for \${student.name}\`:"Choose a student to view transactions"}</div></div></div>
       <div className="table-wrap"><table className="table"><thead><tr><th>Date</th><th>Item</th><th>Cost</th><th>Status</th><th>Action</th></tr></thead><tbody>{transactions.map(tx=><tr key={tx.id}><td>{new Date(tx.purchasedAt).toLocaleString()}</td><td><b>{tx.itemName}</b></td><td>{tx.cost} BB</td><td>{tx.refundedAt?<span className="chip">Refunded</span>:<span className="chip">Purchased</span>}</td><td>{!tx.refundedAt&&<Button className="sm" onClick={()=>refund(tx)}>Refund</Button>}</td></tr>)}{student&&!transactions.length&&<tr><td colSpan="5" className="empty-state">No store purchases yet.</td></tr>}{!student&&<tr><td colSpan="5" className="empty-state">Choose a student above.</td></tr>}</tbody></table></div>
     </div>
   </div>;
