@@ -10,7 +10,7 @@
     {id:"party",name:"Pizza, Chips, & Soda Party",cost:2500,note:"Notify Mr. A in advance; food arrangements must be approved"}
   ];
 
-  function componentSource(){return String.raw`
+  function componentSource(){return `
 function BandStore({state,setState}){
   const ensemble=state.settings.activeEnsemble;
   const players=state.students.filter(s=>s.active!==false&&s.ensemble===ensemble).sort((a,b)=>a.name.localeCompare(b.name));
@@ -24,7 +24,7 @@ function BandStore({state,setState}){
   function buy(item){
     if(!student)return alert("Choose a student first.");
     if(balance<item.cost)return alert(\`\${student.name} needs \${item.cost-balance} more Band Bucks for \${item.name}.\`);
-    if(!confirm(\`Purchase \${item.name} for \${student.name} for \${item.cost} Band Bucks?\n\nCurrent balance: \${balance}\nNew balance: \${balance-item.cost}\`))return;
+    if(!confirm(\`Purchase \${item.name} for \${student.name} for \${item.cost} Band Bucks?\\n\\nCurrent balance: \${balance}\\nNew balance: \${balance-item.cost}\`))return;
     const tx={id:uid(),studentId:student.id,studentName:student.name,ensemble:student.ensemble,itemId:item.id,itemName:item.name,cost:item.cost,purchasedAt:new Date().toISOString(),refundedAt:null};
     setState(q=>({...q,students:q.students.map(s=>s.id===student.id?{...s,bandBucks:Math.max(0,Number(s.bandBucks||0)-item.cost)}:s),storeTransactions:[...(q.storeTransactions||[]),tx],meta:{...q.meta,lastStorePurchase:tx}}));
     flash(\`\${student.name} purchased \${item.name} for \${item.cost} Band Bucks.\`);
