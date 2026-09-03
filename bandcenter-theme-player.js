@@ -10,9 +10,10 @@
     champions:{label:"We Are the Champions",chunks:[
       "audio-v16-compact/champions-0.b64",
       "audio-v16-compact/champions-1.b64",
-      "audio-v16-compact/champions-2.b64",
+      "audio-v16-compact/champions-2a.b64",
+      "audio-v16-compact/champions-2b.b64",
       "audio-v16-compact/champions-3.b64"
-    ],lengths:[6000,6000,6000,3996]},
+    ],lengths:[6000,6000,3000,3000,3996]},
     applause:{label:"Applause",chunks:[
       "audio-v16-compact/applause-0.b64",
       "audio-v16-compact/applause-1.b64",
