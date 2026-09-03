@@ -9,13 +9,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="bandcenter.css" />
-  <link rel="stylesheet" href="bandcenter-v2.css?v=14" />
-  <link rel="stylesheet" href="bandcenter-store.css?v=14" />
-  <link rel="stylesheet" href="bandcenter-bracket.css?v=14" />
-  <link rel="stylesheet" href="bandcenter-history.css?v=14" />
-  <link rel="stylesheet" href="bandcenter-dynamic.css?v=14" />
-  <link rel="stylesheet" href="bandcenter-v13.css?v=14" />
-  <link rel="stylesheet" href="bandcenter-theme-player.css?v=14" />
+  <link rel="stylesheet" href="bandcenter-v2.css?v=15" />
+  <link rel="stylesheet" href="bandcenter-store.css?v=15" />
+  <link rel="stylesheet" href="bandcenter-bracket.css?v=15" />
+  <link rel="stylesheet" href="bandcenter-history.css?v=15" />
+  <link rel="stylesheet" href="bandcenter-dynamic.css?v=15" />
+  <link rel="stylesheet" href="bandcenter-v13.css?v=15" />
+  <link rel="stylesheet" href="bandcenter-theme-player.css?v=15" />
   <style>
     #boot-status{font-family:Inter,system-ui,sans-serif;max-width:760px;margin:72px auto;padding:28px;border-radius:18px;background:#06172e;color:#fff;box-shadow:0 18px 55px rgba(0,0,0,.18)}
     #boot-status h1{margin:0 0 8px;font-size:32px}#boot-status p{margin:7px 0;color:#c9d8ec;line-height:1.55}
@@ -34,26 +34,26 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
   <script src="bandcenter-config.js"></script>
-  <script src="bandcenter-ensembles.js?v=14"></script>
-  <script src="bandcenter-store-patch.js?v=14"></script>
-  <script src="bandcenter-bracket-patch.js?v=14"></script>
-  <script src="bandcenter-bracket-fix.js?v=14"></script>
-  <script src="bandcenter-tournament-management-patch.js?v=14"></script>
-  <script src="bandcenter-history-rankings-patch.js?v=14"></script>
-  <script src="bandcenter-history-fix.js?v=14"></script>
-  <script src="bandcenter-dynamic-patch.js?v=14"></script>
-  <script src="bandcenter-dynamic-fix.js?v=14"></script>
-  <script src="bandcenter-v12-assert.js?v=14"></script>
-  <script src="bandcenter-wording-fix.js?v=14"></script>
-  <script src="bandcenter-v13-patch.js?v=14"></script>
-  <script src="bandcenter-v13-assert.js?v=14"></script>
+  <script src="bandcenter-ensembles.js?v=15"></script>
+  <script src="bandcenter-store-patch.js?v=15"></script>
+  <script src="bandcenter-bracket-patch.js?v=15"></script>
+  <script src="bandcenter-bracket-fix.js?v=15"></script>
+  <script src="bandcenter-tournament-management-patch.js?v=15"></script>
+  <script src="bandcenter-history-rankings-patch.js?v=15"></script>
+  <script src="bandcenter-history-fix.js?v=15"></script>
+  <script src="bandcenter-dynamic-patch.js?v=15"></script>
+  <script src="bandcenter-dynamic-fix.js?v=15"></script>
+  <script src="bandcenter-v12-assert.js?v=15"></script>
+  <script src="bandcenter-wording-fix.js?v=15"></script>
+  <script src="bandcenter-v13-patch.js?v=15"></script>
+  <script src="bandcenter-v13-assert.js?v=15"></script>
   <script>
     (async function bootBandCenter(){
       try{
         if(!window.React) throw new Error('React failed to load from the CDN.');
         if(!window.ReactDOM) throw new Error('ReactDOM failed to load from the CDN.');
         if(!window.Babel) throw new Error('Babel failed to load from the CDN.');
-        const response=await fetch('./bandcenter-app.js?v=14',{cache:'no-store'});
+        const response=await fetch('./bandcenter-app.js?v=15',{cache:'no-store'});
         if(!response.ok) throw new Error('Could not load bandcenter-app.js (HTTP '+response.status+').');
         let source=await response.text();
         if(!source.trim()) throw new Error('bandcenter-app.js loaded but was empty.');
@@ -64,6 +64,6 @@
       }catch(err){console.error('BandCenter boot failed',err);showBootError(err&&err.stack?err.stack:err);}
     })();
   </script>
-  <script src="bandcenter-theme-player.js?v=14"></script>
+  <script src="bandcenter-theme-player.js?v=15"></script>
 </body>
 </html>
