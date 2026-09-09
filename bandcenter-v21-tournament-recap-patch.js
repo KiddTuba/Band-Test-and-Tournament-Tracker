@@ -2,9 +2,9 @@
   const previousPatch=window.BANDCENTER_PATCH_SOURCE;
 
   const helpers=`
-function tournamentResultDate(t){return normalizeCareerDate(t?.finishedDate||t?.completedAt||t?.lastUpdatedAt||t?.date||t?.createdAt||"");}
+function tournamentResultDate(t){return normalizeCareerDate(t?.finishedDate||t?.completedAt||t?.archivedAt||t?.lastUpdatedAt||t?.date||t?.createdAt||"");}
 function tournamentCareerDate(t){return tournamentResultDate(t);}
-function tournamentResultStamp(t){return t?.finishedDate||t?.completedAt||t?.lastUpdatedAt||t?.date||t?.createdAt||"";}
+function tournamentResultStamp(t){return t?.finishedDate||t?.completedAt||t?.archivedAt||t?.lastUpdatedAt||t?.date||t?.createdAt||"";}
 function tournamentMatchRows(t){
   const rows=[];
   const add=(rounds,scope)=>{(rounds||[]).forEach((round,ri)=>(round.matches||[]).forEach((match,mi)=>rows.push({scope,roundName:round.name||("Round "+(ri+1)),ri,mi,match})));};
