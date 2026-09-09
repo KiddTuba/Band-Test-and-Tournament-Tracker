@@ -93,7 +93,8 @@ function HallManager({state,setState}){
 function tickerItems(state,ensemble){
   const board=allStats(state,ensemble),hall=hallRecords(state,ensemble),profiles=allCareerProfiles(state,ensemble),recent=[],current=[],milestones=[],archive=[];
   const add=(bucket,text,stamp)=>bucket.push({text,stamp:stamp||""});
-  const bracket=state.meta?.lastBracketAction;if(bracket?.ensemble===ensemble&&bracket.text)add(recent,"LATEST: "+bracket.text,bracket.at);\n  const historyEdit=state.meta?.lastHistoryEdit;if(historyEdit?.ensemble===ensemble&&historyEdit.text)add(recent,"RECORD BOOK UPDATE: "+historyEdit.text,historyEdit.at);
+  const bracket=state.meta?.lastBracketAction;if(bracket?.ensemble===ensemble&&bracket.text)add(recent,"LATEST: "+bracket.text,bracket.at);
+  const historyEdit=state.meta?.lastHistoryEdit;if(historyEdit?.ensemble===ensemble&&historyEdit.text)add(recent,"RECORD BOOK UPDATE: "+historyEdit.text,historyEdit.at);
   const latestChallenge=(state.challenges||[]).filter(c=>c.ensemble===ensemble).sort((a,b)=>(b.updatedAt||b.date||"").localeCompare(a.updatedAt||a.date||""))[0];const scoreStory=latestScoreStory(state,ensemble);if(latestChallenge&&scoreStory)add(recent,"LATEST CHALLENGE: "+scoreStory,latestChallenge.updatedAt||latestChallenge.date);
   (state.storeTransactions||[]).filter(x=>x.ensemble===ensemble).slice(-8).forEach(x=>add(recent,(x.refundedAt?"STORE REFUND: ":"BAND STORE: ")+x.studentName+(x.refundedAt?" refunded ":" bought ")+x.itemName+(x.cost?" • "+x.cost+" BB":""),x.refundedAt||x.purchasedAt));
   (state.communityActions||[]).filter(a=>a.ensemble===ensemble).slice(-12).forEach(a=>{if(a.type==="donation")add(recent,"LEGACY GIFT: "+a.donorName+" gave "+Number(a.amount||0).toLocaleString()+" BB to "+a.recipientName,a.at);else if(a.type==="legacyBonus")add(recent,"LEGACY BONUS: "+a.studentName+" crossed 15,000 BB donated and earned 10,000 BB",a.at);});
