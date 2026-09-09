@@ -118,10 +118,10 @@ function tickerItems(state,ensemble){
 
   window.BANDCENTER_PATCH_SOURCE=function(source){
     let out=previousPatch?previousPatch(source):source;
-    out=out.replace(/function competitiveProfile\\(state,studentId,ensemble\\)\\{[\\s\\S]*?function donationProfile/,helpers.trim()+"\\nfunction donationProfile");
-    out=out.replace(/function hallRecords\\(state,ensemble\\)\\{[\\s\\S]*?function latestHallChampion/,"function latestHallChampion");
-    out=out.replace(/function HallManager\\(\\{state,setState\\}\\)\\{[\\s\\S]*?function Settings/,managerSource.trim()+"\\nfunction Settings");
-    out=out.replace(/function tickerItems\\(state,ensemble\\)\\{[\\s\\S]*?function Header/,tickerSource.trim()+"\\nfunction Header");
+    out=out.replace(/function competitiveProfile\(state,studentId,ensemble\)\{[\s\S]*?function donationProfile/,helpers.trim()+"\nfunction donationProfile");
+    out=out.replace(/function hallRecords\(state,ensemble\)\{[\s\S]*?function latestHallChampion/,"function latestHallChampion");
+    out=out.replace(/function HallManager\(\{state,setState\}\)\{[\s\S]*?function Settings/,managerSource.trim()+"\nfunction Settings");
+    out=out.replace(/function tickerItems\(state,ensemble\)\{[\s\S]*?function Header/,tickerSource.trim()+"\nfunction Header");
     out=out.replace('const next=updateTournamentWinner(t,scope,ri,mi,w);if(next.championId){','const next=updateTournamentWinner(t,scope,ri,mi,w);next.lastUpdatedAt=new Date().toISOString();if(next.championId){');
     out=out.replace('if(next.championId&&next.championId!==before){const s=q.students.find(x=>x.id===next.championId);','if(next.championId&&next.championId!==before){next.completedAt=next.lastUpdatedAt;const s=q.students.find(x=>x.id===next.championId);');
     if(!out.includes("CAREER_BASELINE_LEGACY_CUTOFF"))throw new Error("BandCenter v19 career baseline patch did not apply.");
