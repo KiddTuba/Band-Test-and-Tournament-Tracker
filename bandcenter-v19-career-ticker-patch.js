@@ -2,7 +2,7 @@
   const previousPatch=window.BANDCENTER_PATCH_SOURCE;
   const LEGACY_BASELINE_CUTOFF="2026-09-08";
 
-  const helpers=\`
+  const helpers=`
 const CAREER_BASELINE_LEGACY_CUTOFF="2026-09-08";
 function tournamentSortStamp(t){return t?.completedAt||t?.lastUpdatedAt||t?.date||t?.createdAt||"";}
 function rawCareerTournamentStats(state,studentId,ensemble,predicate){
@@ -75,9 +75,9 @@ function hallRecords(state,ensemble){
   });
   return out.filter(r=>r.totalTitles>0||r.defenses>0).sort((a,b)=>b.totalTitles-a.totalTitles||b.defenses-a.defenses||a.name.localeCompare(b.name));
 }
-\`;
+`;
 
-  const managerSource=\`
+  const managerSource=`
 function HallManager({state,setState}){
   const ensemble=state.settings.activeEnsemble,players=(state.students||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));const[form,setForm]=useState({studentId:"",legacyName:"",tournamentName:"",date:today()});const manual=(state.hallManualEntries||[]).filter(e=>e.ensemble===ensemble).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
   function addHistorical(){const student=players.find(s=>s.id===form.studentId),championName=student?.name||form.legacyName.trim();if(!championName||!form.tournamentName.trim())return alert("Enter a champion and tournament name.");const entry={id:uid(),studentId:student?.id||null,championName,ensemble,tournamentName:form.tournamentName.trim(),date:form.date||"",createdAt:new Date().toISOString()};setState(q=>({...q,hallManualEntries:[...(q.hallManualEntries||[]),entry]}));setForm({studentId:"",legacyName:"",tournamentName:"",date:today()});}
@@ -87,9 +87,9 @@ function HallManager({state,setState}){
   const fields=[['titles','Titles'],['defenses','Defenses'],['appearances','Apps'],['tournamentWins','Tournament Wins'],['finalFours','Final 4'],['finals','Finals']];
   return <div className="grid"><div className="card"><div className="card-head"><div><div className="card-title">All-Time History</div><div className="realname">Add missing championship events for current students or alumni.</div></div></div><div className="card-body history-entry-grid"><div><label>Known player</label><Select value={form.studentId} onChange={e=>setForm({...form,studentId:e.target.value,legacyName:""})}><option value="">Choose player or use alumni name</option>{players.map(s=><option key={s.id} value={s.id}>{s.name} • {s.instrument} • {s.retired?"Alumni / Retired":s.ensemble}</option>)}</Select></div><div><label>Alumni / historical name</label><Input value={form.legacyName} disabled={!!form.studentId} onChange={e=>setForm({...form,legacyName:e.target.value})} placeholder="Name not in current roster"/></div><div><label>Tournament / title</label><Input value={form.tournamentName} onChange={e=>setForm({...form,tournamentName:e.target.value})} placeholder="Spring Band Madness"/></div><div><label>Date</label><Input type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/></div><div style={{alignSelf:"end"}}><Button className="gold" onClick={addHistorical}>Add Championship Record</Button></div></div></div><div className="card"><div className="card-head"><div><div className="card-title">Career Baselines + Live Results</div><div className="realname">Enter the historical total you know. BandCenter remembers what was already recorded at that moment, then adds only tournament results that happen afterward.</div></div></div><div className="table-wrap"><table className="table"><thead><tr><th>Player</th><th>Season +/-</th>{fields.map(f=><th key={f[0]}>{f[1]}</th>)}<th>Giving</th><th>Mode</th></tr></thead><tbody>{players.map(s=>{const comp=competitiveProfile(state,s.id,ensemble),gift=donationProfile(state,s.id,ensemble),hall=hallRecords(state,ensemble).find(r=>r.studentId===s.id),current={titles:hall?.totalTitles||0,defenses:hall?.defenses||0,appearances:comp.appearances,tournamentWins:comp.tournamentWins,finalFours:comp.finalFours,finals:comp.finals};return <tr key={s.id}><td><b>{s.name}</b>{s.retired&&<span className="alumni-chip">Alumni</span>}<div className="realname">{s.moniker||""}</div></td><td><Input className="history-total-input" type="number" value={Number(s.rankingAdjustments?.[ensemble]||0)} onChange={e=>patchRanking(s.id,e.target.value)}/></td>{fields.map(([key])=>{const exact=careerExactValue(s,ensemble,key),delta=exact===null?0:Math.max(0,Number(current[key]||0)-Number(exact||0));return <td key={key}><Input className="history-total-input" type="number" min="0" value={exact===null?"":exact} placeholder={String(current[key]||0)} onChange={e=>patchExact(s.id,key,e.target.value)}/><div className="derived-number">now: {current[key]||0}{exact!==null&&delta>0?" • +"+delta+" since baseline":""}</div></td>})}<td><b>{gift.amountDonated.toLocaleString()} BB</b><div className="profile-note">{gift.timesDonated} gifts • {gift.mentorships} mentorships</div></td><td><Button className="sm" onClick={()=>clearExact(s.id)}>Use Recorded History</Button></td></tr>})}</tbody></table></div><div className="card-body"><div className="realname">Existing baselines from before this update are treated as history through September 7, 2026, so tournament results from September 8 forward are added automatically.</div></div></div><div className="card"><div className="card-head"><div><div className="card-title">Historical Championship Records</div><div className="realname">Named events describe the résumé beneath the totals. They do not double-count an official baseline.</div></div></div><div className="table-wrap"><table className="table"><thead><tr><th>Champion</th><th>Championship</th><th>Date</th><th>Action</th></tr></thead><tbody>{manual.map(e=><tr key={e.id}><td><b>{e.championName}</b></td><td>{e.tournamentName}</td><td>{e.date||"—"}</td><td><Button className="sm red" onClick={()=>confirm("Remove this historical record?")&&setState(q=>({...q,hallManualEntries:(q.hallManualEntries||[]).filter(x=>x.id!==e.id)}))}>Remove</Button></td></tr>)}{!manual.length&&<tr><td colSpan="4" className="empty-state">No manual historical records yet.</td></tr>}</tbody></table></div></div></div>;
 }
-\`;
+`;
 
-  const tickerSource=\`
+  const tickerSource=`
 function tickerItems(state,ensemble){
   const board=allStats(state,ensemble),hall=hallRecords(state,ensemble),profiles=allCareerProfiles(state,ensemble),recent=[],current=[],milestones=[],archive=[];
   const add=(bucket,text,stamp)=>bucket.push({text,stamp:stamp||""});
@@ -114,7 +114,7 @@ function tickerItems(state,ensemble){
   archive.sort((a,b)=>String(b.stamp).localeCompare(String(a.stamp)));
   return[...recent,...current,...milestones,...archive].map(x=>x.text);
 }
-\`;
+`;
 
   window.BANDCENTER_PATCH_SOURCE=function(source){
     let out=previousPatch?previousPatch(source):source;
