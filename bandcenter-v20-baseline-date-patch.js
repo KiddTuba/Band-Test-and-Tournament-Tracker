@@ -4,6 +4,27 @@
 
   const helpers=`
 const CAREER_DEFAULT_BASELINE_THROUGH="2026-09-07";
+function tournamentSortStamp(t){return t?.completedAt||t?.lastUpdatedAt||t?.date||t?.createdAt||"";}
+function rawCareerTournamentStats(state,studentId,ensemble,predicate){
+  let appearances=0,tournamentWins=0,finalFours=0,finals=0,titles=0;
+  for(const t of state.tournaments||[]){
+    if(t.ensemble!==ensemble||!studentId)continue;
+    if(predicate&&!predicate(t))continue;
+    const parts=tournamentParticipants(t);if(!parts.has(studentId))continue;
+    appearances++;
+    allTournamentRounds(t).forEach(r=>(r.matches||[]).forEach(m=>{const w=m.winner||m.winnerId,p1=m.p1||m.p1Id,p2=m.p2||m.p2Id;if(w===studentId&&p1&&p2)tournamentWins++;}));
+    if(t.format==="divisions-v1"){
+      const semis=t.finals?.rounds?.[0]?.matches||[];if(semis.some(m=>m.p1===studentId||m.p2===studentId))finalFours++;
+      const final=t.finals?.rounds?.at(-1)?.matches?.[0];if(final&&(final.p1===studentId||final.p2===studentId))finals++;
+    }else{
+      const rounds=t.rounds||[],semi=rounds.at(-2),final=rounds.at(-1)?.matches?.[0];
+      if(semi?.matches?.some(m=>(m.p1||m.p1Id)===studentId||(m.p2||m.p2Id)===studentId))finalFours++;
+      if(final&&((final.p1||final.p1Id)===studentId||(final.p2||final.p2Id)===studentId))finals++;
+    }
+    if(tournamentChampionId(t)===studentId)titles++;
+  }
+  return{appearances,tournamentWins,finalFours,finals,titles};
+}
 function normalizeCareerDate(value){
   if(!value)return"";
   const raw=String(value).trim();
