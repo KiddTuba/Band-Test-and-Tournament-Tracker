@@ -48,6 +48,18 @@
       '{tab==="Brackets"&&<Brackets state={state}/>} {tab==="Challenge Day"&&<ChallengeDay state={state} setState={setState} isAdmin={admin} audio={audio} toast={toast}/>} {tab==="Hall of Fame"&&<HallOfFame state={state}/>} '
     );
 
+    out=out.replace(
+      'const availableGold=(active?.gold||[]).filter(g=>g.holderId&&!g.safe&&Number(g.defenses||0)<8&&g.holderId!==form.challengerId);',
+      'const availableGold=(active?.gold||[]).filter(g=>g.holderId&&!g.safe&&Number(g.defenses||0)<8&&g.holderId!==form.challengerId);useEffect(()=>{if(form.tier==="gold"&&availableGold.length&&!availableGold.some(g=>g.id===form.targetSlotId))setForm(f=>({...f,targetSlotId:availableGold[0].id}));},[active?.id,form.tier,form.challengerId,availableGold.map(g=>g.id).join("|")]);'
+    );
+    out=out.replace(
+      'profiles.filter(p=>p.appearances).forEach(p=>milestones.push({text:"CAREER FILE: "+p.student.name+" • "+p.appearances+" TOURNAMENTS • "+p.tournamentWins+" WINS • "+p.finalFours+" FINAL FOURS • "+p.finals+" FINALS • "+p.titles+" TITLES"}));',
+      'profiles.filter(p=>p.appearances||p.challengeWins).forEach(p=>milestones.push({text:"CAREER FILE: "+p.student.name+" • "+p.totalVictories+" TOTAL WINS • "+p.tournamentWins+" TOURNAMENT • "+p.challengeWins+" CHALLENGE • "+p.goldCaptures+" GOLD CAPTURES • "+p.platinumCaptures+" PLATINUM TITLES"}));'
+    );
+    out=out.replace(
+      '<div className="mini-stat"><b>{x.wins}</b><span>Bracket Wins</span></div>',
+      '<div className="mini-stat"><b>{x.wins+challengeDayCareerStats(state,x.student.id,state.settings.activeEnsemble).challengeWins}</b><span>Total Victories</span></div>'
+    );
     if(!out.includes("function ChallengeDay({state,setState,isAdmin,audio,toast})"))throw new Error("BandCenter v22 Challenge Day component did not apply.");
     if(!out.includes('publicTabs=["Broadcast","Standings","Player Cards","Brackets","Challenge Day","Hall of Fame"]'))throw new Error("BandCenter v22 Challenge Day tab did not apply.");
     if(!out.includes("PLATINUM SHOCKER:"))throw new Error("BandCenter v22 Challenge Day result engine did not apply.");
