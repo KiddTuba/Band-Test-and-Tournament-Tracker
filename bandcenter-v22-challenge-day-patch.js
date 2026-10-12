@@ -12,7 +12,7 @@
 
     if(!out.includes("function challengeDayCareerStats("))out=out.replace("function Settings({state,setState}){",challengeSource+"\nfunction Settings({state,setState}){");
 
-    out=out.replace(/function hallRecords\(state,ensemble\)\{[\s\S]*?function latestHallChampion/,hallSource.trim()+"\nfunction latestHallChampion");
+    out=out.replace(/function hallRecords\(state,ensemble\)\{[\s\S]*?function donationProfile/,hallSource.trim()+"\nfunction donationProfile");
     out=out.replace(/function latestHallChampion\(state,ensemble\)\{[\s\S]*?\nfunction careerExactValue/,latestHallSource.trim()+"\nfunction careerExactValue");
     out=out.replace(/function allCareerProfiles\(state,ensemble\)\{[\s\S]*?\nfunction HallOfFame/,profilesSource.trim()+"\nfunction HallOfFame");
 
@@ -63,6 +63,7 @@
     if(!out.includes("function ChallengeDay({state,setState,isAdmin,audio,toast})"))throw new Error("BandCenter v22 Challenge Day component did not apply.");
     if(!out.includes('publicTabs=["Broadcast","Standings","Player Cards","Brackets","Challenge Day","Hall of Fame"]'))throw new Error("BandCenter v22 Challenge Day tab did not apply.");
     if(!out.includes("PLATINUM SHOCKER:"))throw new Error("BandCenter v22 Challenge Day result engine did not apply.");
+    if(!out.includes("const allChallenge=challengeDayCareerStats(state,r.studentId,ensemble)"))throw new Error("BandCenter v22 Hall Challenge Day aggregation did not apply.");
     if(!out.includes("<th>Challenge Wins</th><th>Total Wins</th><th>Gold Captures</th>"))throw new Error("BandCenter v22 Hall profile expansion did not apply.");
     return out;
   };
